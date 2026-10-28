@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b5a73">
+  <title>해녀 장터</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>🌊 해녀 장터</h1>
+    <span id="status-badge" class="badge" hidden></span>
+  </header>
+
+  <main>
+    <!-- 1. 판매 등록 -->
+    <section id="tab-sell" class="tab active">
+      <div class="card">
+        <h2>해산물 판매 등록</h2>
+        <p class="hint">사진을 찍으면 AI가 품목을 알아보고 시세로 가격을 추천해요.</p>
+        <label class="photo-button" id="photo-label">
+          <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+          <img id="photo-preview" alt="" hidden>
+          <span id="photo-placeholder">📷<br>사진 찍기</span>
+        </label>
+        <p id="ai-status" class="status" hidden></p>
+      </div>
+
+      <form id="sell-form" class="card" hidden>
+        <h2>확인하고 등록하기</h2>
+        <p id="ai-note" class="note" hidden></p>
+        <div id="ai-choices" class="chips"></div>
+
+        <label>품목
+          <select name="itemName" id="item-select" required></select>
+        </label>
+        <label>상세 이름 <small>(예: 참전복, 보라성게)</small>
+          <input name="detail" maxlength="50">
+        </label>
+        <div class="row">
+          <label>개수
+            <input name="count" type="number" min="0" step="1" inputmode="numeric">
+          </label>
+          <label>무게 (kg)
+            <input name="weightKg" id="weight-input" type="number" min="0" step="0.1" inputmode="decimal">
+          </label>
+        </div>
+        <label>상태
+          <select name="condition">
+            <option>좋음</option><option>보통</option><option>나쁨</option>
+          </select>
+        </label>
+
+        <div id="price-box" class="price-box"></div>
+
+        <label>판매 가격 (원)
+          <input name="price" id="price-input" type="number" min="10" step="10" inputmode="numeric" required>
+        </label>
+        <label>해녀 이름
+          <input name="haenyeoName" id="haenyeo-name" maxlength="30" autocomplete="name">
+        </label>
+        <button type="submit" class="primary big">등록하기</button>
+        <button type="button" class="ghost" id="sell-reset">다시 찍기</button>
+      </form>
+    </section>
+
+    <!-- 2. 내 상품 -->
+    <section id="tab-products" class="tab">
+      <div class="card">
+        <h2>내 상품</h2>
+        <div id="product-list" class="list"></div>
+      </div>
+    </section>
+
+    <!-- 3. 체험 -->
+    <section id="tab-experience" class="tab">
+      <form id="exp-form" class="card">
+        <h2>해녀 체험 등록</h2>
+        <label>체험 이름
+          <input name="title" required maxlength="60" placeholder="예: 해녀와 함께하는 바다 물질 체험">
+        </label>
+        <div class="row">
+          <label>날짜 <input name="date" type="date" required></label>
+          <label>시작 시간 <input name="time" type="time" required></label>
+        </div>
+        <div class="row">
+          <label>소요 시간(분) <input name="durationMin" type="number" min="1" value="120" inputmode="numeric"></label>
+          <label>정원(명) <input name="capacity" type="number" min="1" value="8" required inputmode="numeric"></label>
+        </div>
+        <label>1인 가격 (원)
+          <input name="pricePerPerson" type="number" min="0" step="1000" required inputmode="numeric">
+        </label>
+        <label>모이는 장소
+          <input name="location" required maxlength="100" placeholder="예: ○○항 해녀의 집 앞">
+        </label>
+        <label>체험 설명
+          <textarea name="description" rows="3" maxlength="1000"></textarea>
+        </label>
+        <label>준비물
+          <input name="preparation" maxlength="300" placeholder="예: 수영복, 수건, 여벌 옷">
+        </label>
+        <button type="submit" class="primary big">체험 올리기</button>
+      </form>
+      <div class="card">
+        <h2>등록한 체험</h2>
+        <div id="exp-list" class="list"></div>
+      </div>
+    </section>
+
+    <!-- 4. 예약 -->
+    <section id="tab-reservations" class="tab">
+      <div class="card">
+        <h2>해산물 예약 손님</h2>
+        <p class="hint">미리 예약한 손님은 같은 품목이 올라오면 먼저 연결돼요.</p>
+        <div id="reservation-list" class="list"></div>
+      </div>
+      <details class="card">
+        <summary>테스트용: 손님 예약 만들기</summary>
+        <p class="hint">사용자(관광객) 앱이 생기기 전까지 우선 매칭을 시험해 보는 곳이에요.</p>
+        <form id="reservation-form">
+          <label>손님 이름 <input name="customerName" required maxlength="30"></label>
+          <label>품목 <select name="itemName" id="reservation-item" required></select></label>
+          <label>수량 <input name="quantity" maxlength="30" placeholder="예: 1kg, 10마리"></label>
+          <label>연락처 <input name="contact" maxlength="50" inputmode="tel"></label>
+          <button type="submit" class="primary">예약 추가</button>
+        </form>
+      </details>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button data-tab="sell" class="active"><span>📷</span>판매 등록</button>
+    <button data-tab="products"><span>🐚</span>내 상품</button>
+    <button data-tab="experience"><span>🤿</span>체험</button>
+    <button data-tab="reservations"><span>📋</span>예약</button>
+  </nav>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
