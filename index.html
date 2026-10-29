@@ -752,11 +752,13 @@ const SYSTEM=()=>`너는 '숨비 지킴이' 해녀 안전 도우미다. 사용�
 오늘 수온: ${fresh(LAST.sea)?JSON.stringify({바다:LAST.sea.r.site,수온:LAST.sea.r.temp,판정:LAST.sea.r.verdict,이유:LAST.sea.r.reasons,관측:LAST.sea.r.obsTime}):"아직 없음(도구 사용)"}
 파고 전망(4~10일 뒤, ${fresh(LAST.fcst)?LAST.fcst.r.regName:""}): ${fresh(LAST.fcst)?JSON.stringify(LAST.fcst.r.days.map(d=>[d.date,`${d.waveMin}~${d.waveMax}m`,d.weather,["적합","주의","부적합"][d.level]])):"아직 없음(도구 사용)"}`;
 let history=[];
-let THINK_OFF=true;   // 생각 단계를 꺼서 빠르게 (모델이 거부하면 자동으로 끔 해제)
+// 생각 단계를 줄여 빠르게. 모델마다 받는 설정이 달라서, 거부당하면 다음 방식으로 바꿔 재시도
+const THINK_MODES=[{thinkingBudget:0},{thinkingLevel:"minimal"},{thinkingLevel:"low"},null];
+let thinkIdx=0; try{ thinkIdx=+(localStorage.getItem("sumbi-think")||0)||0; }catch(e){}
 let sysNow="";
 async function gemini(contents){
   const req={systemInstruction:{parts:[{text:sysNow||SYSTEM()}]},contents,tools:TOOLS,generationConfig:{temperature:0.4}};
-  if(THINK_OFF) req.generationConfig.thinkingConfig={thinkingBudget:0};
+  const tm=THINK_MODES[thinkIdx]; if(tm) req.generationConfig.thinkingConfig=tm;
   const body=JSON.stringify(req);
   const useProxy = PROXY && S.proxyInfo?.gemini && !S.ai.key;
   const url = useProxy ? `/api/gemini?model=${encodeURIComponent(S.ai.model)}`
@@ -764,7 +766,7 @@ async function gemini(contents){
   const headers={"Content-Type":"application/json"}; if(!useProxy) headers["x-goog-api-key"]=S.ai.key;
   const res=await fetch(url,{method:"POST",headers,body});
   const j=await res.json().catch(()=>({}));
-  if(!res.ok && res.status===400 && THINK_OFF && /think/i.test(j.error?.message||"")){ THINK_OFF=false; return gemini(contents); }
+  if(!res.ok && res.status===400 && thinkIdx<THINK_MODES.length-1){ thinkIdx++; try{ localStorage.setItem("sumbi-think",thinkIdx); }catch(e){} return gemini(contents); }
   if(!res.ok && res.status===404 && S.ai.model!=="gemini-flash-latest"){ S.ai.model="gemini-flash-latest"; setMode(); return gemini(contents); }
   if(!res.ok){ const m=j.error?.message||res.status; if(res.status===429) throw new Error("무료 사용량을 잠시 다 썼어요. 1분쯤 뒤 다시 해보세요"); throw new Error("AI 호출 실패: "+m); }
   const c=j.candidates?.[0]?.content; if(!c) throw new Error("AI가 답을 주지 않았어요");
