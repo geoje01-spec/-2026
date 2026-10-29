@@ -327,12 +327,14 @@ const DEFAULTS = {
   water:{key:"", tempPath:""},
   t:{lostWarn:60, lostDanger:150, lostCrit:240, fallStill:20, stillWarn:45, countdown:20,
      bpmLo:50, bpmHi:150, tempWarn:15, tempDanger:12, seaMin:12, seaWarn:15, seaHigh:28,
-     waveWarn:1.0, waveMax:1.5, windWarn:7, windMax:10},
+     waveWarn:2.0, waveMax:3.0, windWarn:7, windMax:10},
   report:{place:"", phone:"", lat:"", lon:""},
   names:{1:"김순덕(예시)",2:"고옥자(예시)",3:"양춘자(예시)"},
   site:"DT_0022"
 };
 let S = load();
+// 예전 저장값(파고 1.5m 기준) 갱신: 풍랑주의보 기준 3m에 맞춤
+if(S.v!==2){ S.t.waveMax=3.0; S.t.waveWarn=2.0; S.v=2; save(); }
 function load(){
   let s = null;
   try{ s = JSON.parse(localStorage.getItem("sumbi-settings")||"null"); }catch(e){}
@@ -586,6 +588,7 @@ async function dataGo(path,params){
     throw new Error("공공데이터 응답 오류: "+(m?(m[1]||m[2]||m[3]):text.slice(0,120))+(/SERVICE_KEY|등록되지/.test(text)?" (새 키는 승인 후 1시간쯤 지나야 쓸 수 있어요)":"")); }
   if(j.error) throw new Error(j.error.message||String(j.error));
   const h=j.response?.header||j.header; const code=h?.resultCode;
+  if(code==="03" || /NODATA/.test(h?.resultMsg||"")) return {nodata:true};   // 자료 없음은 오류가 아님
   if(code && code!=="00" && code!=="0") throw new Error(`공공데이터 오류 ${code}: ${h.resultMsg||""}`);
   return j;
 }
@@ -615,8 +618,8 @@ async function getWater(q){
     return {site:st.name,code:st.code,reg:st.reg,temp:Math.round((13+(h%70)/10)*10)/10,source:"데모 수온 (API 미연결)",time:new Date(),obsTime:null};
   }
   let {items}=await waterItems(st.code,today());
-  if(!items.length){ const y=kstNow(); y.setDate(y.getDate()-1); ({items}=await waterItems(st.code,ymd(y))); }   // 이른 아침엔 어제 자료
-  if(!items.length) throw new Error(`${st.name}(${st.code}) 관측 자료가 없어요. 관측소 코드를 확인하세요`);
+  if(!items.length){ const y=kstNow(); y.setDate(y.getDate()-1); ({items}=await waterItems(st.code,ymd(y))); }   // 자정 직후엔 어제 자료
+  if(!items.length) throw new Error(`${st.name} 관측소는 지금 수온 자료가 없어요. 가까운 다른 관측소를 골라보세요`);
   const k=tempKey(items[0]);
   if(!k) throw new Error("응답에서 수온 항목을 찾지 못했어요. 설정 > '수온 응답 보기'로 항목 이름을 확인해 넣어주세요");
   const tk=Object.keys(items[0]).find(x=>/dt|time|date/i.test(x));
