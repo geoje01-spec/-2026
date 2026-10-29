@@ -1,0 +1,24 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>해녀바당 마켓</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Noto+Sans+KR:wght@400;700&display=swap">
+<link rel="stylesheet" href="/market/app.css">
+<script>document.body.classList.add("haenyeo")</script>
+<header class="top">
+  <div class="top-in">
+    <div class="brand">해녀바당<small>해녀가 직접 잡고 직접 파는 바다</small></div>
+    <div class="roles" role="group" aria-label="화면 바꾸기">
+      <button type="button" id="role-h" data-role="h" aria-pressed="true">해녀</button>
+      <button type="button" id="role-c" data-role="c" aria-pressed="false">손님</button>
+    </div>
+    <div class="mode" id="mode"></div>
+  </div>
+</header>
+<main id="view" aria-live="polite"></main>
+<nav class="tabs" aria-label="메뉴"><div class="tabs-in" id="tabs"></div></nav>
+<script src="/market/agents.js"></script>
+<script src="/market/app.js"></script>
+
+</body></html>

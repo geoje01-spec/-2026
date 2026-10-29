@@ -12,3 +12,8 @@
 API 키는 이 저장소에 넣지 않습니다. Vercel 환경변수로 넣습니다.
 - `DATA_GO_KEY` 공공데이터포털 일반 인증키(Encoding)
 - `GEMINI_KEY` Google AI Studio Gemini 키
+
+## 해녀바당 마켓 (`/market/`)
+해녀가 사진으로 해산물을 올리면 가격·예약 매칭·배송 일정을 에이전트가 잡아주는 직거래 앱.
+- 주소: 배포 주소 뒤에 `/market/`
+- 사진 판별은 `api/analyze.js`(Gemini, 같은 GEMINI_KEY 사용), 판매·예약 데이터는 각 기기 브라우저에 저장
