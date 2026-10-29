@@ -326,7 +326,7 @@ pre.raw{background:var(--sunk);border-radius:8px;padding:10px;font-family:var(--
 "use strict";
 /* ================= 설정 ================= */
 const DEFAULTS = {
-  ai:{key:"", model:"gemini-flash-latest"},
+  ai:{key:"", model:"gemini-flash-lite-latest"},
   water:{key:"", tempPath:""},
   t:{lostWarn:60, lostDanger:150, lostCrit:240, fallStill:20, stillWarn:45, countdown:20,
      bpmLo:50, bpmHi:150, tempWarn:15, tempDanger:12, seaMin:12, seaWarn:15, seaHigh:28,
@@ -337,7 +337,9 @@ const DEFAULTS = {
 };
 let S = load();
 // 예전 저장값(파고 1.5m 기준) 갱신: 풍랑주의보 기준 3m에 맞춤
-if(S.v!==2){ S.t.waveMax=3.0; S.t.waveWarn=2.0; S.v=2; save(); }
+if(!(S.v>=2)){ S.t.waveMax=3.0; S.t.waveWarn=2.0; }
+// 더 빠른 모델로 교체 (예전 기본값만 바꿈)
+if(!(S.v>=3)){ if(S.ai.model==="gemini-flash-latest") S.ai.model="gemini-flash-lite-latest"; S.v=3; save(); }
 function load(){
   let s = null;
   try{ s = JSON.parse(localStorage.getItem("sumbi-settings")||"null"); }catch(e){}
@@ -690,12 +692,15 @@ function renderFcst(f){
    ${f.days.map(d=>`<tr><td>${d.date}</td><td class="num">${d.waveMin??"-"}~${d.waveMax??"-"}</td><td>${esc(d.weather)}</td><td>${pill(d.level)}</td></tr>`).join("")}
    </tbody></table></div><p class="note" style="margin:6px 0 0">기상청 중기예보는 4일 뒤부터 나와요. 오늘 판단은 실측 수온으로 합니다.</p>`;
 }
+// 최근 조회 결과 (AI가 다시 부르지 않고 바로 쓰도록 보관, 10분 유효)
+const LAST={sea:null,fcst:null};
+const fresh=x=>x && Date.now()-x.at<600000;
 async function checkSea(site){
-  try{ const w=await getWater(site); const a=assessDive(w); renderWater(w,a); return {...w, ...a}; }
+  try{ const w=await getWater(site); const a=assessDive(w); renderWater(w,a); const r={...w, ...a}; LAST.sea={code:w.code,at:Date.now(),r}; return r; }
   catch(e){ $("seaOut").innerHTML=`<p class="note" style="color:var(--danger)">${esc(e.message||e)}</p>${PROXY?"":`<p class="note">브라우저 직접 호출이 막혔을 수 있어요(CORS). server.py로 실행하면 해결돼요.</p>`}`; return {error:String(e.message||e)}; }
 }
 async function checkFcst(site){
-  try{ const f=await getSeaFcst(station(site)?.reg); renderFcst(f); return f; }
+  try{ const f=await getSeaFcst(station(site)?.reg); renderFcst(f); LAST.fcst={reg:f.reg,at:Date.now(),r:f}; return f; }
   catch(e){ $("fcstOut").innerHTML=`<p class="note" style="color:var(--danger)">해상예보: ${esc(e.message||e)}</p>`; return {error:String(e.message||e)}; }
 }
 $("seaSite").innerHTML=STATIONS.map(s=>`<option value="${s.code}">${s.name} (${REG_NAME[s.reg]})</option>`).join("");
@@ -727,34 +732,46 @@ const TOOLS=[{functionDeclarations:[
 ]}];
 async function runTool(name,args){
   if(name==="get_divers_status") return {divers:diversStatus()};
-  if(name==="check_sea_conditions") return await checkSea(args.site||S.site);
-  if(name==="get_sea_forecast") return await checkFcst(args.site||S.site);
+  if(name==="check_sea_conditions"){ const st=station(args.site||S.site); if(fresh(LAST.sea) && st && LAST.sea.code===st.code) return LAST.sea.r; return await checkSea(args.site||S.site); }
+  if(name==="get_sea_forecast"){ const st=station(args.site||S.site); if(fresh(LAST.fcst) && st && LAST.fcst.reg===st.reg) return LAST.fcst.r; return await checkFcst(args.site||S.site); }
   if(name==="open_emergency_report"){ const d=divers.get(+args.diver_id); if(!d) return {error:"그 번호의 해녀가 없음"}; if(args.reason) d.reasons=[args.reason,...d.reasons]; openEmergency(d,true); return {ok:true,note:"모의 신고 확인 화면을 열었음. 실제 신고는 전송되지 않음"}; }
   return {error:"알 수 없는 도구"};
 }
 const TOOL_LABEL={get_divers_status:"해녀 상태 조회",check_sea_conditions:"실측 수온 조회",get_sea_forecast:"기상청 해상예보 조회",open_emergency_report:"신고 화면 열기"};
 const SYSTEM=()=>`너는 '숨비 지킴이' 해녀 안전 도우미다. 사용자는 해녀 또는 해녀를 돌보는 관리자다.
 - 쉬운 우리말로, 짧고 분명하게 답한다. 어르신도 이해할 수 있게 전문용어는 풀어서 말한다. 마크다운 기호(**, #)는 쓰지 않는다.
-- 해녀 건강, 오늘 수온, 앞으로의 파고를 물으면 반드시 도구로 실제 값을 확인한 뒤 답한다. 값을 지어내지 않는다.
-- 오늘 물질 여부는 check_sea_conditions의 판정을 그대로 따르고, 이유와 실천할 조언(물질 시간, 휴식, 보온, 동료와 함께)을 덧붙인다.
+- 아래 '지금 화면의 데이터'에 답이 있으면 도구를 부르지 말고 바로 답한다. 다른 바다를 묻거나 데이터가 없을 때만 도구를 쓴다. 값을 지어내지 않는다.
+- 답은 3~5문장 정도로 짧게 한다.
+- 오늘 물질 여부는 수온 판정을 그대로 따르고, 이유와 실천할 조언(물질 시간, 휴식, 보온, 동료와 함께)을 덧붙인다.
 - 며칠 뒤 계획은 get_sea_forecast를 쓴다. 이 예보는 4~10일 뒤만 있으니 1~3일 뒤는 예보가 없다고 솔직히 말한다.
 - 위급 판단과 신고는 앱의 규칙 시스템이 담당한다. 신고 화면은 데모데이 시연용 모의 신고이며 실제로 보냈다고 말하지 않는다.
 - 사람이 위험해 보이면 해양경찰 122, 119에 바로 전화하라고 안내한다.
-- 오늘(한국 시각): ${kstNow().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"})}. 사용자가 고른 오늘 바다: ${station(S.site)?.name||S.site}.`;
+- 오늘(한국 시각): ${kstNow().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"})}. 사용자가 고른 오늘 바다: ${station(S.site)?.name||S.site}.
+[지금 화면의 데이터]
+해녀 상태: ${JSON.stringify(diversStatus().map(d=>({이름:d.name,단계:d.level,이유:d.reasons,맥박:d.bpm,무움직임초:d.still_sec,신호끊김초:d.seconds_since_signal})))}
+오늘 수온: ${fresh(LAST.sea)?JSON.stringify({바다:LAST.sea.r.site,수온:LAST.sea.r.temp,판정:LAST.sea.r.verdict,이유:LAST.sea.r.reasons,관측:LAST.sea.r.obsTime}):"아직 없음(도구 사용)"}
+파고 전망(4~10일 뒤, ${fresh(LAST.fcst)?LAST.fcst.r.regName:""}): ${fresh(LAST.fcst)?JSON.stringify(LAST.fcst.r.days.map(d=>[d.date,`${d.waveMin}~${d.waveMax}m`,d.weather,["적합","주의","부적합"][d.level]])):"아직 없음(도구 사용)"}`;
 let history=[];
+let THINK_OFF=true;   // 생각 단계를 꺼서 빠르게 (모델이 거부하면 자동으로 끔 해제)
+let sysNow="";
 async function gemini(contents){
-  const body=JSON.stringify({systemInstruction:{parts:[{text:SYSTEM()}]},contents,tools:TOOLS});
+  const req={systemInstruction:{parts:[{text:sysNow||SYSTEM()}]},contents,tools:TOOLS,generationConfig:{temperature:0.4}};
+  if(THINK_OFF) req.generationConfig.thinkingConfig={thinkingBudget:0};
+  const body=JSON.stringify(req);
   const useProxy = PROXY && S.proxyInfo?.gemini && !S.ai.key;
   const url = useProxy ? `/api/gemini?model=${encodeURIComponent(S.ai.model)}`
     : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.ai.model)}:generateContent`;
   const headers={"Content-Type":"application/json"}; if(!useProxy) headers["x-goog-api-key"]=S.ai.key;
   const res=await fetch(url,{method:"POST",headers,body});
   const j=await res.json().catch(()=>({}));
+  if(!res.ok && res.status===400 && THINK_OFF && /think/i.test(j.error?.message||"")){ THINK_OFF=false; return gemini(contents); }
+  if(!res.ok && res.status===404 && S.ai.model!=="gemini-flash-latest"){ S.ai.model="gemini-flash-latest"; setMode(); return gemini(contents); }
   if(!res.ok){ const m=j.error?.message||res.status; if(res.status===429) throw new Error("무료 사용량을 잠시 다 썼어요. 1분쯤 뒤 다시 해보세요"); throw new Error("AI 호출 실패: "+m); }
   const c=j.candidates?.[0]?.content; if(!c) throw new Error("AI가 답을 주지 않았어요");
   return c;
 }
 async function agentLLM(text){
+  sysNow=SYSTEM();   // 질문 시점의 화면 데이터를 함께 보냄
   history.push({role:"user",parts:[{text}]});
   for(let step=0;step<6;step++){
     const c=await gemini(history); history.push(c);
