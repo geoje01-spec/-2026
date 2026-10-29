@@ -16,6 +16,7 @@ radio.setTransmitPower(7)
 
 let sos = 0          // 1이면 해녀가 직접 SOS 요청
 let fall = 0         // 1이면 자유낙하 또는 강한 충격 감지
+let asking = false   // true면 관제(AI 에이전트)가 "괜찮으세요?" 확인 중
 let lastMove = input.runningTime()
 let bpm = -1         // 맥박 센서가 없으면 -1
 let lastBeat = 0
@@ -29,18 +30,50 @@ input.onGesture(Gesture.SixG, function () {
     fall = 1
 })
 
-// A+B 동시에 누르기 = SOS
-input.onButtonPressed(Button.AB, function () {
-    sos = 1
-    basic.showIcon(IconNames.No)
+// 관제에서 확인 신호가 오면 소리·불빛으로 알림. 형식: Q,번호
+radio.onReceivedString(function (s) {
+    if (s == "Q," + DIVER_ID) {
+        asking = true
+    }
 })
-// A 버튼 = "괜찮아요" (SOS·쓰러짐 해제)
-input.onButtonPressed(Button.A, function () {
+control.inBackground(function () {
+    while (true) {
+        if (asking) {
+            basic.showIcon(IconNames.Surprised)
+            music.playTone(Note.C5, music.beat(BeatFraction.Quarter))   // V2는 내장 스피커, V1은 P0 부저
+            basic.pause(150)
+            basic.clearScreen()
+            music.playTone(Note.G5, music.beat(BeatFraction.Quarter))
+            basic.pause(150)
+        } else {
+            basic.pause(200)
+        }
+    }
+})
+
+// "괜찮아요" 응답 = A 또는 B 버튼 (장갑 낀 손으로 아무거나 누르면 됨)
+function answerOk() {
+    if (asking) {
+        asking = false
+        for (let i = 0; i < 3; i++) {          // 놓치지 않게 3번 보냄
+            radio.sendString("A," + DIVER_ID)
+            basic.pause(100)
+        }
+    }
     sos = 0
     fall = 0
     basic.showIcon(IconNames.Yes)
     basic.pause(500)
     basic.clearScreen()
+}
+input.onButtonPressed(Button.A, answerOk)
+input.onButtonPressed(Button.B, answerOk)
+
+// A+B 동시에 누르기 = SOS (확인 없이 바로 신고)
+input.onButtonPressed(Button.AB, function () {
+    sos = 1
+    asking = false
+    basic.showIcon(IconNames.No)
 })
 
 // 움직임 감지 (0.1초마다)
@@ -88,7 +121,7 @@ basic.forever(function () {
     if (still > 999) still = 999
     const msg = DIVER_ID + "," + input.temperature() + "," + bpm + "," + fall + "," + still + "," + sos
     radio.sendString(msg)
-    if (sos == 0 && fall == 0) {
+    if (sos == 0 && fall == 0 && !asking) {
         led.toggle(2, 2)   // 가운데 불빛이 깜빡이면 정상 전송 중
     }
     basic.pause(1000)
