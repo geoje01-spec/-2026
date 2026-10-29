@@ -122,7 +122,10 @@ select,input[type=text],input[type=number],input[type=password],textarea{backgro
 .scale-bar i{display:block;height:100%}
 .scale-marker{position:relative;height:14px}
 .scale-marker span{position:absolute;top:0;width:2px;height:14px;background:var(--ink);transform:translateX(-1px)}
-.scale-ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.scale-ticks{position:relative;height:16px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.scale-ticks span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.scale-ticks span:first-child{transform:none}
+.scale-ticks span:last-child{transform:translateX(-100%)}
 
 /* 에이전트 */
 .chat{display:flex;flex-direction:column;gap:10px;max-height:440px;min-height:240px;overflow:auto;padding:4px 2px 8px}
@@ -676,7 +679,7 @@ function renderWater(w,a){
    <div class="scale" aria-label="수온 기준 막대">
      <div class="scale-bar">${seg(lo,T.seaMin,"var(--danger)")}${seg(T.seaMin,T.seaWarn,"var(--warn)")}${seg(T.seaWarn,T.seaHigh,"var(--ok)")}${seg(T.seaHigh,hi,"var(--warn)")}</div>
      <div class="scale-marker"><span style="left:${pct(w.temp)}%"></span></div>
-     <div class="scale-ticks"><span>${lo}℃</span><span>${T.seaMin}</span><span>${T.seaWarn}</span><span>${T.seaHigh}</span><span>${hi}℃</span></div>
+     <div class="scale-ticks"><span style="left:0">${lo}℃</span><span style="left:${pct(T.seaMin)}%">${T.seaMin}</span><span style="left:${pct(T.seaWarn)}%">${T.seaWarn}</span><span style="left:${pct(T.seaHigh)}%">${T.seaHigh}</span><span style="left:100%">${hi}℃</span></div>
    </div>
    <ul class="reasons" style="margin-top:8px">${a.reasons.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
 }
@@ -698,6 +701,8 @@ async function checkFcst(site){
 $("seaSite").innerHTML=STATIONS.map(s=>`<option value="${s.code}">${s.name} (${REG_NAME[s.reg]})</option>`).join("");
 $("seaSite").value=station(S.site)?.code||"DT_0022";
 $("seaForm").onsubmit=e=>{ e.preventDefault(); S.site=$("seaSite").value; save(); checkSea(S.site); checkFcst(S.site); };
+// 바다를 바꾸면 바로 다시 조회 (선택과 결과가 어긋나지 않게)
+$("seaSite").addEventListener("change",()=>{ $("seaOut").innerHTML=`<p class="note">불러오는 중…</p>`; $("seaForm").requestSubmit(); });
 
 /* ================= AI 에이전트 ================= */
 const chatEl=$("chat");
