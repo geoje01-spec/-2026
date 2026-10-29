@@ -330,7 +330,7 @@ const DEFAULTS = {
   water:{key:"", tempPath:""},
   t:{lostWarn:60, lostDanger:150, lostCrit:240, fallStill:20, stillWarn:45, countdown:20,
      bpmLo:50, bpmHi:150, tempWarn:15, tempDanger:12, seaMin:12, seaWarn:15, seaHigh:28,
-     waveWarn:2.0, waveMax:3.0, windWarn:7, windMax:10},
+     waveWarn:2.5, waveMax:3.0, windWarn:7, windMax:10},
   report:{place:"", phone:"", lat:"", lon:""},
   names:{1:"김순덕(예시)",2:"고옥자(예시)",3:"양춘자(예시)"},
   site:"DT_0022"
@@ -339,7 +339,9 @@ let S = load();
 // 예전 저장값(파고 1.5m 기준) 갱신: 풍랑주의보 기준 3m에 맞춤
 if(!(S.v>=2)){ S.t.waveMax=3.0; S.t.waveWarn=2.0; }
 // 더 빠른 모델로 교체 (예전 기본값만 바꿈)
-if(!(S.v>=3)){ if(S.ai.model==="gemini-flash-latest") S.ai.model="gemini-flash-lite-latest"; S.v=3; save(); }
+if(!(S.v>=3)){ if(S.ai.model==="gemini-flash-latest") S.ai.model="gemini-flash-lite-latest"; }
+// 파고 기준 완화: 2.5m 이상 주의, 3m 이상 부적합
+if(!(S.v>=4)){ S.t.waveWarn=2.5; S.t.waveMax=3.0; S.v=4; save(); }
 function load(){
   let s = null;
   try{ s = JSON.parse(localStorage.getItem("sumbi-settings")||"null"); }catch(e){}
@@ -853,7 +855,7 @@ $("setClose").onclick=()=>$("settings").close();
 $("setSave").onclick=()=>{
   for(const [id,[a,b,num]] of Object.entries(F)){ const v=$(id).value.trim(); S[a][b]=num?(parseFloat(v)||DEFAULTS[a][b]):v; }
   const bp=$("tBpm").value.split(",").map(Number); if(bp.length===2&&bp.every(n=>n>0)){ S.t.bpmLo=bp[0]; S.t.bpmHi=bp[1]; }
-  S.t.waveWarn=Math.round(S.t.waveMax*0.67*10)/10;
+  S.t.waveWarn=Math.max(0.5,Math.round((S.t.waveMax-0.5)*10)/10);
   const names={}; $("rNames").value.split("\n").forEach(l=>{ const m=l.match(/^\s*(\d+)\s*=\s*(.+)$/); if(m) names[m[1]]=m[2].trim(); }); if(Object.keys(names).length) S.names=names;
   if(!S.ai.model) S.ai.model=DEFAULTS.ai.model;
   save(); setMode(); renderSim(); history=[]; $("settings").close(); toast("설정을 저장했어요"); checkSea(S.site); checkFcst(S.site);
