@@ -123,7 +123,7 @@
   }
   function shareText(p) {
     const sp = SP[p.species], a = p.author;
-    return `[해녀바당] ${p.promo}\n\n${sp.ko} ${p.grade}등급 ${kg(p.weightKg)}${p.askPerKg ? ` · kg당 ${won(p.askPerKg)}` : ''}\n연락: ${a.name} 해녀 ${a.phone}\n${a.place ? '만나는 곳: ' + a.place : ''}${a.hours ? ` (${a.hours})` : ''}\n${location.origin}/market/`;
+    return `[해녀바당] ${p.promo}\n\n${A.label(p.species, p.variety)} ${p.grade}등급 ${kg(p.weightKg)}${p.askPerKg ? ` · kg당 ${won(p.askPerKg)}` : ''}\n연락: ${a.name} 해녀 ${a.phone}\n${a.place ? '만나는 곳: ' + a.place : ''}${a.hours ? ` (${a.hours})` : ''}\n${location.origin}/market/`;
   }
   /* ---------- 먼저 보기 예약 ---------- */
   const myWants = () => S.wants.filter((w) => w.ownerId === DEV);
@@ -133,7 +133,7 @@
   function teaser(p) {
     const sp = SP[p.species];
     return `<article class="card teaser">
-      <div class="row between"><h2>${esc(sp.ko)} <span class="muted small">${esc(p.grade)}등급</span></h2><span class="pill warn">예약 손님 먼저 보는 중</span></div>
+      <div class="row between"><h2>${esc(A.label(p.species, p.variety))} <span class="muted small">${esc(p.grade)}등급</span></h2><span class="pill warn">예약 손님 먼저 보는 중</span></div>
       <p style="margin:0">${esc(p.author.village)} 해녀가 방금 ${esc(sp.ko)}${josa(sp.ko, '을', '를')} 올렸어요. 미리 예약한 손님이 먼저 보고 있어요.</p>
       <p class="muted small" style="margin:0"><b class="num">${minsLeft(p.earlyUntil)}분</b> 뒤에 모두에게 공개돼요. 다음부터 먼저 보고 싶으면 📅 버튼으로 예약하세요.</p>
     </article>`;
@@ -154,14 +154,14 @@
       ${early ? `<div class="banner">📅 예약하신 ${esc(sp.ko)}${josa(sp.ko, '이', '가')} 올라왔어요! 다른 손님보다 먼저 보고 있어요. ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개돼요.</div>` : ''}
       ${owner && isEarly(p) ? `<div class="notice">예약 손님에게 먼저 보여주는 중 · ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개</div>` : ''}
       ${p.photo ? `<img class="photo" src="${esc(p.photo)}" alt="${esc(sp.ko)} 사진">` : ''}
-      <div class="row between"><h2>${esc(sp.ko)} <span class="muted small">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
+      <div class="row between"><h2>${esc(A.label(p.species, p.variety))} <span class="muted small">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
       <div class="kv"><span>${esc(ago(p.createdAt))} 올림</span><span>양 <b>${kg(p.weightKg)}</b></span>${p.example ? '<span class="pill info">예시 글</span>' : ''}</div>
       ${p.promo ? `<p class="promo">${esc(p.promo)}</p>` : ''}
       <div class="row between" style="align-items:flex-end">
         ${p.askPerKg ? `<div class="price num" style="font-size:32px">${won(p.askPerKg).replace('원', '')}<small>원 / kg</small></div>` : '<strong>가격은 연락해서 물어보세요</strong>'}
         <span class="muted small">참고 시세 kg당 ${won(p.refPerKg)}${p.refLive ? ' (aT)' : ''}</span>
       </div>
-      ${owner ? ownerBtns : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 연락해 보세요.</p>' + contact(p.author, sp.ko) : contact(p.author, sp.ko))}
+      ${owner ? ownerBtns : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 연락해 보세요.</p>' + contact(p.author, A.label(p.species, p.variety)) : contact(p.author, A.label(p.species, p.variety)))}
     </article>`;
   }
 
@@ -209,8 +209,12 @@
       <section class="card">
         <div class="row between"><div class="eyebrow">AI가 본 결과</div>${d.ai.demo ? '<span class="pill info">데모</span>' : `<span class="pill ${d.ai.confidence >= .7 ? 'ok' : 'warn'}">확신 ${Math.round((d.ai.confidence || 0) * 100)}%</span>`}</div>
         ${d.ai.notes ? `<p style="margin:0">${esc(d.ai.notes)}</p>` : ''}
+        ${d.ai.basis ? `<p class="muted small" style="margin:0">구분 근거: ${esc(d.ai.basis)}</p>` : ''}
+        ${Array.isArray(d.ai.others) && d.ai.others.length ? `<p class="muted small" style="margin:0">함께 보여요: ${esc(d.ai.others.map((o) => (o.name || '') + (o.count ? ' ' + o.count + '개' : '')).join(', '))}. 따로 올리려면 다시 찍어 주세요.</p>` : ''}
         <h3>품목</h3>
         <div class="chips">${Object.entries(SP).map(([k, v]) => `<button type="button" class="chip" data-act="d-species" data-v="${k}" aria-pressed="${k === d.species}">${esc(v.ko)}</button>`).join('')}</div>
+        ${(() => { const list = (A.VARIETIES[d.species] || []).slice(); if (d.variety && !list.includes(d.variety)) list.unshift(d.variety); return list.length ? `<h3>세부 품종 <span class="muted small" style="font-weight:400">${d.ai.variety ? 'AI가 고른 값, 맞는지 봐 주세요' : '아는 경우만 골라 주세요'}</span></h3>
+        <div class="chips">${list.map((v) => `<button type="button" class="chip" data-act="d-variety" data-v="${esc(v)}" aria-pressed="${v === d.variety}">${esc(v)}</button>`).join('')}<button type="button" class="chip" data-act="d-variety" data-v="" aria-pressed="${!d.variety}">모름</button></div>` : ''; })()}
         <h3>등급</h3>
         <div class="chips">${Object.keys(A.GRADES).map((g) => `<button type="button" class="chip" data-act="d-grade" data-v="${g}" aria-pressed="${g === d.grade}">${g}</button>`).join('')}</div>
         <h3>양 <span class="muted small" style="font-weight:400">대충 맞춰도 돼요</span></h3>
@@ -423,7 +427,7 @@
       if (!['최상', '좋음', '보통'].includes(ai.freshness)) ai.freshness = '좋음';
       if (ai.isSeafood === false) ai.notes = '해산물이 잘 안 보여요. 다시 찍거나 아래에서 직접 골라 주세요. ' + (ai.notes || '');
       Object.assign(d, {
-        status: 'ready', ai, species: ai.species, grade: ai.grade, freshness: ai.freshness,
+        status: 'ready', ai, species: ai.species, variety: (typeof ai.variety === 'string' && ai.variety.trim() && !/모름|없음|unknown/i.test(ai.variety)) ? ai.variety.trim().slice(0, 20) : null, grade: ai.grade, freshness: ai.freshness,
         weightKg: Math.max(0.5, Math.round((ai.estWeightKg || 1) * 2) / 2)
       });
       d.askPerKg = A.refPrice(d);
@@ -438,7 +442,7 @@
     if (!CONFIG.gemini) { d.variant++; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); return; }
     d.rewriting = true; render();
     const prompt = `제주 해녀가 직접 잡은 해산물을 손님에게 알리는 짧은 홍보 글을 써라. 해녀 어르신의 따뜻한 말투, 2~3문장, 이모지와 해시태그 없이.
-품목: ${SP[d.species].ko}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 해녀: ${ui.me.name.replace('(예시)', '')}, 동네: ${ui.me.village}.
+품목: ${A.label(d.species, d.variety)}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 해녀: ${ui.me.name.replace('(예시)', '')}, 동네: ${ui.me.village}.
 가격과 전화번호는 넣지 마라. 이전 글과 다르게 써라: "${d.promo}"
 글만 답하라.`;
     const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.9 } });
@@ -489,7 +493,8 @@
       case 'copy': copy(v, '전화번호를 복사했어요.'); break;
       case 'dismiss-post': ui.lastPost = null; render(); break;
       case 'retake': ui.draft = { status: 'idle' }; render(); break;
-      case 'd-species': d.species = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
+      case 'd-variety': d.variety = v || null; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
+      case 'd-species': d.variety = null; d.species = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
       case 'd-grade': d.grade = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); render(); break;
       case 'd-fresh': d.freshness = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); render(); break;
       case 'd-w': d.weightKg = Math.max(0.5, Math.round((d.weightKg + +v) * 10) / 10); render(); break;
@@ -504,7 +509,7 @@
           const p = await mutate((s) => {
             const post = {
               id: A.uid('p'), ownerId: DEV, author: Object.assign({}, ui.me),
-              species: d.species, grade: d.grade, freshness: d.freshness, weightKg: d.weightKg,
+              species: d.species, variety: d.variety || null, grade: d.grade, freshness: d.freshness, weightKg: d.weightKg,
               refPerKg: A.refPrice(d), refLive: A.basePerKg(d.species).live, askPerKg: d.askPerKg, photo: d.photo || null,
               promo: d.promo, createdAt: new Date().toISOString(), status: 'open'
             };

@@ -1,4 +1,7 @@
 {
   "regions": ["icn1"],
-  "functions": { "api/price.js": { "maxDuration": 30 } }
+  "functions": {
+    "api/price.js": { "maxDuration": 30 },
+    "api/analyze.js": { "maxDuration": 30 }
+  }
 }

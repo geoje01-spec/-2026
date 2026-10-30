@@ -17,8 +17,39 @@
     urchin:      { ko: '성게(통)',   refPerKg: 20000 },
     seaweed:     { ko: '미역',       refPerKg: 6000 },
     hijiki:      { ko: '톳',         refPerKg: 5000 },
-    agar:        { ko: '우뭇가사리', refPerKg: 9000 }
+    agar:        { ko: '우뭇가사리', refPerKg: 9000 },
+    bomal:       { ko: '보말',       refPerKg: 15000 },
+    mussel:      { ko: '홍합(섭)',   refPerKg: 8000 },
+    oyster:      { ko: '굴',         refPerKg: 15000 },
+    seasquirt:   { ko: '멍게',       refPerKg: 9000 },
+    sealhare:    { ko: '군소',       refPerKg: 10000 },
+    barnacle:    { ko: '거북손',     refPerKg: 20000 },
+    gulfweed:    { ko: '모자반',     refPerKg: 4000 },
+    ecklonia:    { ko: '감태',       refPerKg: 5000 }
   };
+  // 세부 품종: AI가 사진에서 이 중 하나로 구분 (목록에 없으면 보이는 대로 한국어 이름)
+  const VARIETIES = {
+    abalone: ['참전복', '까막전복', '말전복', '시볼트전복'],
+    turban: ['뿔소라', '민소라'],
+    octopus: ['돌문어(참문어)', '대문어(피문어)', '왜문어'],
+    seacucumber: ['홍해삼', '청해삼', '흑해삼'],
+    urchinroe: ['보라성게알', '말똥성게알'],
+    urchin: ['보라성게', '말똥성게', '둥근성게'],
+    seaweed: ['돌미역(자연산)', '양식 미역'],
+    bomal: ['밤고둥', '팽이고둥', '눈알고둥', '울타리고둥'],
+    mussel: ['참홍합(섭)', '진주담치'],
+    oyster: ['참굴', '바위굴'],
+    seasquirt: ['붉은멍게', '돌멍게'],
+    sealhare: ['군소', '검은군소'],
+    gulfweed: ['참모자반(몸)', '괭생이모자반']
+  };
+  // 화면에 보일 이름: 세부 품종이 품목 이름을 품으면 그대로(홍해삼), 아니면 함께(보말 · 밤고둥)
+  function label(species, variety) {
+    const ko = (SPECIES[species] || {}).ko || '해산물';
+    if (!variety) return ko;
+    const base = ko.replace(/\(.*\)/, '');
+    return variety.includes(base) ? variety : ko + ' · ' + variety;
+  }
   const GRADES = { '특': 1.2, '상': 1.0, '중': 0.85 };
   const FRESH = { '최상': 1.05, '좋음': 1, '보통': 0.95 };
   const MAX_POSTS = 20;
@@ -34,7 +65,8 @@
   const MARKET = {};
   const PRICE_NAMES = {
     abalone: ['전복'], obunjagi: ['오분자기'], turban: ['소라'], octopus: ['문어'], seacucumber: ['해삼'],
-    urchinroe: ['성게'], urchin: ['성게'], seaweed: ['미역'], hijiki: ['톳'], agar: ['우뭇가사리', '우무']
+    urchinroe: ['성게'], urchin: ['성게'], seaweed: ['미역'], hijiki: ['톳'], agar: ['우뭇가사리', '우무'],
+    oyster: ['굴'], mussel: ['홍합'], seasquirt: ['멍게']
   };
   const SKIP = /(건|마른|젓|액젓|냉동|수입|염장|조미|가공)/;   // 말린 것·가공품은 생물 가격과 달라서 뺌
   const median = (a) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
@@ -77,8 +109,8 @@
   }
 
   // AI가 없을 때 쓰는 홍보 글 틀
-  function promo({ species, grade, freshness, weightKg, author }, variant) {
-    const ko = (SPECIES[species] || {}).ko || '해산물';
+  function promo({ species, variety, grade, freshness, weightKg, author }, variant) {
+    const ko = label(species, variety);
     const who = author && author.name ? author.name.replace(/\(예시\)/, '') + ' 해녀' : '해녀';
     const where = author && author.village ? author.village.replace(/ 어촌계$/, '') + ' 바다' : '제주 바다';
     const fresh = freshness === '최상' ? '방금 건져 올려 펄떡펄떡 살아 있어요' : freshness === '보통' ? '오늘 안에 드시면 좋아요' : '오늘 물질해서 아주 싱싱해요';
@@ -95,7 +127,9 @@
     abalone: ['전복'], obunjagi: ['오분자기', '떡조개'], turban: ['소라', '뿔소라'],
     octopus: ['문어', '돌문어', '참문어', '피문어'], seacucumber: ['해삼'],
     urchinroe: ['성게알', '성게 알', '우니', '성게'], urchin: ['통성게', '성게(통)', '성게 통'],
-    seaweed: ['미역'], hijiki: ['톳'], agar: ['우뭇가사리', '우무', '천초']
+    seaweed: ['미역'], hijiki: ['톳'], agar: ['우뭇가사리', '우무', '천초'],
+    bomal: ['보말', '고둥', '고매기'], mussel: ['홍합', '섭', '담치'], oyster: ['굴'], seasquirt: ['멍게', '우렁쉥이'],
+    sealhare: ['군소'], barnacle: ['거북손'], gulfweed: ['모자반', '몸국'], ecklonia: ['감태']
   };
   function detect(text) {
     const t = String(text || '');
@@ -136,7 +170,7 @@
     };
   }
 
-  const api = { detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET };
+  const api = { label, VARIETIES, detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);
