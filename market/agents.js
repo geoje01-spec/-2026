@@ -117,15 +117,42 @@
   }
 
   // AI가 없을 때 쓰는 홍보 글 틀
+  // 홍보 글: 눈길 끄는 첫 줄 → 맛·식감·누가 어디서 → 양 한정과 연락 유도
+  const TASTE = {
+    abalone: '쫄깃하게 씹히고 바다 향이 진해요. 회로도, 버터구이로도 좋아요',
+    obunjagi: '전복보다 작아도 맛은 더 진하고 달아요',
+    turban: '꼬들꼬들 씹히는 맛에 끝맛이 살짝 쌉싸름해요. 숙회로 드시면 딱이에요',
+    octopus: '살짝 데치면 부드럽고 달큰해요',
+    seacucumber: '오독오독 씹히는 소리부터 달라요',
+    urchinroe: '입에 넣으면 녹으면서 단맛이 퍼져요',
+    urchin: '갈라서 바로 떠 드시면 단맛이 진해요',
+    seaweed: '미역국 끓이면 국물이 뽀얗게 우러나요',
+    hijiki: '데쳐서 무치면 오독오독해요',
+    agar: '삶아 굳히면 탱글한 우무가 돼요',
+    bomal: '보말죽, 보말칼국수 끓이면 국물이 진하게 우러나요',
+    mussel: '국물 내면 시원하고 살이 통통해요',
+    oyster: '알이 굵고 비린내 없이 고소해요',
+    seasquirt: '향이 진하고 끝맛이 달큰해요',
+    sealhare: '데쳐서 썰면 쫀득해요',
+    barnacle: '삶아서 까 먹으면 고소하고 짭조름해요',
+    gulfweed: '몸국 끓이기 딱 좋아요',
+    ecklonia: '쌉싸름한 향이 좋아 무침으로 그만이에요'
+  };
   function promo({ species, variety, grade, freshness, weightKg, author }, variant) {
     const ko = label(species, variety);
-    const who = author && author.name ? author.name.replace(/\(예시\)/, '') + ' 해녀' : '해녀';
-    const where = author && author.village ? author.village.replace(/ 어촌계$/, '') + ' 바다' : '제주 바다';
-    const fresh = freshness === '최상' ? '방금 건져 올려 펄떡펄떡 살아 있어요' : freshness === '보통' ? '오늘 안에 드시면 좋아요' : '오늘 물질해서 아주 싱싱해요';
+    const name = author && author.name ? author.name.replace(/\(예시\)/, '').trim() : '';
+    const who = name ? name + ' 해녀' : '해녀';
+    const sea = author && author.village ? author.village.replace(/ 어촌계$/, '') + ' 앞바다' : '제주 앞바다';
+    const taste = TASTE[species] || '바다에서 바로 올라와 맛이 살아 있어요';
+    const alive = freshness === '최상' ? '아직 살아서 꿈틀거려요' : freshness === '보통' ? '오늘 안에 드시는 걸 권해요' : '오늘 아침 물질한 거라 싱싱해요';
+    const top = grade === '특' ? '큰 놈들로만 골랐어요' : grade === '상' ? '알 좋은 걸로 골랐어요' : '집에서 편하게 드시기 좋은 크기예요';
+    const where = author && author.place ? author.place : '';
+    const when = author && author.hours ? author.hours : '';
+    const pickup = where || when ? `\n📍 ${[where, when].filter(Boolean).join(' · ')}` : '';
     const v = [
-      `오늘 ${where}에서 ${who}가 직접 물질해 온 ${ko}${josa(ko, '이에요', '예요')}. ${fresh}. ${grade}등급으로 ${weightKg}kg 있어요. 필요하신 분은 편하게 연락 주세요.`,
-      `${ko} 들어왔어요! ${who}가 숨 참고 한 개 한 개 따온 ${grade}등급 ${ko}${josa(ko, '이에요', '예요')}. ${fresh}. 양이 많지 않으니 먼저 연락 주시는 분께 드릴게요.`,
-      `${where} 맑은 물에서 자란 ${ko}${josa(ko, '을', '를')} ${who}가 오늘 잡았어요. 중간 상인 없이 해녀에게 바로 사시는 거라 더 싱싱하고 정직해요. ${weightKg}kg, 전화나 문자 주세요.`
+      `【오늘 ${sea}에서 막 올라온 ${ko}】\n${who}가 숨 참고 한 개 한 개 따 온 ${ko}${josa(ko, '이에요', '예요')}. ${alive}. ${taste}.\n오늘 들어온 건 ${weightKg}kg뿐이에요. 다 나가면 다음 물질 때까지 없어요.${pickup}`,
+      `【양식 아니고, 해녀가 직접 땄어요】\n${sea} ${ko}, ${top}. ${taste}.\n중간 상인 없이 바다에서 바로 식탁으로 가요. 먼저 연락 주시는 분께 드려요.${pickup}`,
+      `${ko} 좋아하시는 분, 오늘이에요 🌊\n${sea} 물이 차고 맑아서 살이 꽉 찼어요. ${alive}. ${taste}.\n${weightKg}kg 한정이에요. 전화나 문자 주시면 챙겨 둘게요.${pickup}`
     ];
     return v[(variant || 0) % v.length];
   }

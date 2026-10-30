@@ -236,7 +236,7 @@
       </section>
       <section class="card">
         <div class="row between"><div class="eyebrow">홍보 글</div><button type="button" class="btn sm" data-act="rewrite" ${d.rewriting ? 'disabled' : ''}>${d.rewriting ? '쓰는 중…' : 'AI가 다시 쓰기'}</button></div>
-        <label class="field" for="promo">손님에게 보일 글 (고쳐도 돼요)<textarea id="promo" rows="4">${esc(d.promo)}</textarea></label>
+        <label class="field" for="promo">손님에게 보일 글 (고쳐도 돼요)<textarea id="promo" rows="6">${esc(d.promo)}</textarea></label>
       </section>
       <section class="card">
         <div class="eyebrow">손님이 연락할 곳</div>
@@ -442,9 +442,14 @@
     const ta = $('#promo'); if (ta) d.promo = ta.value;
     if (!CONFIG.gemini) { d.variant++; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); return; }
     d.rewriting = true; render();
-    const prompt = `제주 해녀가 직접 잡은 해산물을 손님에게 알리는 짧은 홍보 글을 써라. 해녀 어르신의 따뜻한 말투, 2~3문장, 이모지와 해시태그 없이.
-품목: ${A.label(d.species, d.variety)}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 해녀: ${ui.me.name.replace('(예시)', '')}, 동네: ${ui.me.village}.
-가격과 전화번호는 넣지 마라. 이전 글과 다르게 써라: "${d.promo}"
+    const prompt = `제주 해녀가 직접 잡은 해산물 홍보 글을 새로 써라.
+품목: ${A.label(d.species, d.variety)}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 해녀: ${ui.me.name.replace('(예시)', '')}, 동네: ${ui.me.village}, 만나는 곳: ${ui.me.place || '없음'}, 판매 시간: ${ui.me.hours || '없음'}.
+홍보 글 규칙: 카카오톡 단체방·밴드에 올릴 진짜 홍보 글처럼 쓴다.
+1줄: 【】 안에 눈길 끄는 한 줄 (15자 안팎, 예: 【오늘 아침 막 올라온 홍해삼】, 【양식 아니고, 해녀가 직접 땄어요】)
+2~3줄: 누가 어디서 언제 잡았는지 + 맛·식감·향 같은 감각 표현 + 어떻게 먹으면 좋은지 한 가지. 해녀 어르신의 따뜻한 구어체("~요").
+마지막 줄: 양 한정이나 오늘만이라는 이유로 지금 연락하게 만드는 한 줄.
+이모지는 많아야 1개. "신선한 해산물을 만나보세요", "최고의 품질" 같은 뻔한 광고 문구와 "몸에 좋아요", "OO 예방" 같은 효능 주장은 쓰지 않는다. 가격과 전화번호는 넣지 않는다(앱이 따로 붙임).
+이전 글과 첫 줄과 표현을 다르게 써라: "${d.promo}"
 글만 답하라.`;
     const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { temperature: 0.9 } });
     try {
