@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 body{margin:0}
+[hidden]{display:none!important}
 
 /* Layout: 상단 연결 바 → 왼쪽 해녀 상태판(관제), 오른쪽 오늘 바다 + 에이전트 대화. 좁으면 한 줄로 쌓임 */
 :root{
@@ -133,6 +134,11 @@ select,input[type=text],input[type=number],input[type=password],textarea{backgro
 .msg.user{align-self:flex-end;background:var(--sea);color:var(--sea-ink);border-bottom-right-radius:3px}
 .msg.bot{align-self:flex-start;background:var(--sunk);border-bottom-left-radius:3px}
 .msg.tool{align-self:flex-start;background:transparent;border:1px dashed var(--line);color:var(--muted);font-size:12.5px;padding:4px 10px}
+.state{display:flex;justify-content:space-between;align-items:center;gap:8px;border-radius:8px;padding:6px 10px;font-size:13.5px}
+.state.under{background:var(--sea);color:var(--sea-ink)}
+.state.surface{background:var(--ok-bg);color:var(--ok)}
+.state b{font-size:15px}
+.tl{width:100%;height:14px;display:block}
 .msg.trace{padding:8px 12px;max-width:92%}
 .msg.trace b{font-size:12px;color:var(--ink);font-weight:600}
 .msg.trace ol{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:2px}
@@ -205,11 +211,11 @@ pre.raw{background:var(--sunk);border-radius:8px;padding:10px;font-family:var(--
   <div class="col">
     <section class="panel">
       <div class="panel-h">
-        <div><div class="eyebrow">실시간 관제</div><h2>해녀 상태</h2></div>
+        <div><div class="eyebrow">실시간 관제</div><h2>해녀 상태</h2><div class="note" id="stateSum"></div></div>
         <span class="note" id="clock"></span>
       </div>
       <div class="divers" id="divers"></div>
-      <p class="note" style="margin:12px 0 0">물속에서는 라디오 신호가 끊기는 것이 정상입니다. 끊긴 시간이 기준(설정)을 넘으면 단계적으로 경고합니다. 위급 단계에서는 AI 에이전트가 먼저 해녀에게 확인 신호를 보내고, 응답이 없을 때만 해양경찰(122)·119 <b>모의</b> 신고로 넘어갑니다.</p>
+      <p class="note" style="margin:12px 0 0">라디오 신호가 <b>끊기면 물질 중(물속)</b>, <b>다시 잡히면 휴식 중(물 위)</b>으로 봅니다. 물속 시간이 기준(설정)을 넘거나 충분히 쉬지 않고 다시 들어가면 단계적으로 경고하고, 위급하면 주변 해녀에게 도움 신호를 보낸 뒤 올라오지 않을 때만 해양경찰(122)·119 <b>모의</b> 신고로 넘어갑니다.</p>
     </section>
 
     <section class="panel" id="simPanel">
@@ -285,9 +291,10 @@ pre.raw{background:var(--sunk);border-radius:8px;padding:10px;font-family:var(--
     <fieldset>
       <legend>경보 기준</legend>
       <div class="row2">
-        <label class="field">신호 끊김 주의(초)<input type="number" id="tLostWarn"></label>
-        <label class="field">신호 끊김 위험(초)<input type="number" id="tLostDanger"></label>
-        <label class="field">신호 끊김 위급(초)<input type="number" id="tLostCrit"></label>
+        <label class="field">물속(신호 끊김) 주의(초)<input type="number" id="tLostWarn"></label>
+        <label class="field">물속 위험(초)<input type="number" id="tLostDanger"></label>
+        <label class="field">물속 위급(초)<input type="number" id="tLostCrit"></label>
+        <label class="field">최소 물 위 휴식(초)<input type="number" id="tMinRest"></label>
         <label class="field">충격 후 무움직임 위급(초)<input type="number" id="tFallStill"></label>
         <label class="field">무움직임 주의(초)<input type="number" id="tStillWarn"></label>
         <label class="field">해녀 응답 기다리는 시간(초)<input type="number" id="tCountdown"></label>
@@ -322,7 +329,7 @@ pre.raw{background:var(--sunk);border-radius:8px;padding:10px;font-family:var(--
     <p style="margin:0" id="emgWhy"></p>
     <div class="check-box"><span class="ping" aria-hidden="true"></span><span id="emgMsg"></span></div>
     <div class="count mono" id="emgCount">30</div>
-    <p class="note" style="margin:0;text-align:center">초 안에 해녀가 응답하지 않으면 비상 상황으로 판단해 해양경찰·119 신고 화면으로 넘어갑니다.</p>
+    <p class="note" style="margin:0;text-align:center" id="emgNote">초 안에 해녀가 응답하지 않으면 비상 상황으로 판단해 해양경찰·119 신고 화면으로 넘어갑니다.</p>
   </div>
   <div class="dlg-b" id="emgStep2" hidden>
     <span class="mock-badge">시연용 모의 신고입니다. 실제로 전송되지 않았습니다.</span>
@@ -353,7 +360,7 @@ pre.raw{background:var(--sunk);border-radius:8px;padding:10px;font-family:var(--
 const DEFAULTS = {
   ai:{key:"", model:"gemini-flash-lite-latest"},
   water:{key:"", tempPath:""},
-  t:{lostWarn:60, lostDanger:150, lostCrit:240, fallStill:20, stillWarn:45, countdown:30,
+  t:{lostWarn:90, lostDanger:150, lostCrit:210, minRest:30, fallStill:20, stillWarn:45, countdown:30,
      bpmLo:50, bpmHi:150, tempWarn:15, tempDanger:12, seaMin:12, seaWarn:15, seaHigh:28,
      waveWarn:2.5, waveMax:3.0, windWarn:7, windMax:10},
   report:{place:"", phone:"", lat:"", lon:""},
@@ -367,7 +374,9 @@ if(!(S.v>=2)){ S.t.waveMax=3.0; S.t.waveWarn=2.0; }
 if(!(S.v>=3)){ if(S.ai.model==="gemini-flash-latest") S.ai.model="gemini-flash-lite-latest"; }
 // 파고 기준 완화: 2.5m 이상 주의, 3m 이상 부적합
 if(!(S.v>=4)){ S.t.waveWarn=2.5; S.t.waveMax=3.0; }
-if(!(S.v>=5)){ if(S.t.countdown===20) S.t.countdown=30; S.v=5; save(); }
+if(!(S.v>=5)){ if(S.t.countdown===20) S.t.countdown=30; }
+// 라디오 신호로 물속/물 위를 판단하는 방식에 맞춘 기준 (물속 90초 주의, 150초 위험, 210초 위급)
+if(!(S.v>=6)){ S.t.lostWarn=90; S.t.lostDanger=150; S.t.lostCrit=210; S.t.minRest=S.t.minRest||30; S.v=6; save(); }
 function load(){
   let s = null;
   try{ s = JSON.parse(localStorage.getItem("sumbi-settings")||"null"); }catch(e){}
@@ -396,7 +405,8 @@ document.addEventListener("pointerdown",()=>{ try{ audio = audio || new (window.
 /* ================= 해녀 데이터 ================= */
 const divers = new Map();
 function diver(id){
-  if(!divers.has(id)) divers.set(id,{id, last:null, lastAt:0, hist:[], level:0, reasons:[], ackUntil:0, reported:false, prevLevel:0});
+  if(!divers.has(id)) divers.set(id,{id, last:null, lastAt:0, hist:[], level:0, reasons:[], ackUntil:0, reported:false, prevLevel:0,
+    under:false, diveStart:0, surfacedAt:0, dives:[], restBefore:null, shortRest:false, tl:[]});
   return divers.get(id);
 }
 const nameOf = id => S.names[id] || `해녀 ${id}`;
@@ -412,6 +422,16 @@ function ingest(line){
   const id=parseInt(p[1]); if(!(id>0)) return;
   const pk={temp:+p[2], bpm:+p[3], fall:+p[4], still:+p[5], sos:+p[6], rssi:p[7]!==undefined?+p[7]:null};
   const d=diver(id);
+  // 라디오가 다시 잡힘 = 물 위로 올라옴. 끊겨 있던 시간이 한 번의 잠수 시간
+  const gap=d.lastAt?(now()-d.lastAt)/1000:0;
+  if(d.lastAt && gap>SURF_GAP){
+    const len=Math.round(gap); d.dives.push({len,end:now()}); if(d.dives.length>200) d.dives.shift();
+    d.under=false; d.surfacedAt=now(); d.shortRest=false;
+    if(len>=S.t.lostWarn) log(`${nameOf(id)}: ${len}초 잠수 후 물 위로 올라옴`);
+    if(d.pendingRecall){ d.pendingRecall=false; sendLine(`R,${id}`); log(`${nameOf(id)}: 올라와서 미뤄둔 휴식 신호 전달`); }
+    if(emg.active && emg.diver===d && emg.stage===1 && emg.under) setTimeout(()=>onSurface(id,len),0);
+  }
+  if(!d.surfacedAt) d.surfacedAt=now();
   // 물질 시작 시각: 처음 신호를 받았거나 15분 넘게 끊겼다가 다시 들어오면 새로 셈
   if(!d.sessionStart || now()-d.lastAt>15*60000) d.sessionStart=now()-(sim.on&&!d.lastAt?Math.round(rnd(5,25))*60000:0);
   d.last=pk; d.lastAt=now();
@@ -421,10 +441,16 @@ function ingest(line){
 function evaluate(d){
   const T=S.t, r=[]; let lv=0; const up=(l,msg)=>{ lv=Math.max(lv,l); r.push(msg); };
   if(!d.last){ return {level:0,reasons:["신호 대기 중"]}; }
-  const lost=(now()-d.lastAt)/1000;
-  if(lost>=T.lostCrit) up(3,`${Math.round(lost)}초째 신호 없음 (수면 위로 안 올라옴)`);
-  else if(lost>=T.lostDanger) up(2,`${Math.round(lost)}초째 신호 없음`);
-  else if(lost>=T.lostWarn) up(1,`잠수 중 (${Math.round(lost)}초)`);
+  const lost=(now()-d.lastAt)/1000, under=lost>SURF_GAP, sec=Math.round(lost);
+  if(under){
+    if(lost>=T.lostCrit) up(3,`물속 ${sec}초째 안 올라옴`);
+    else if(lost>=T.lostDanger) up(2,`물속 ${sec}초째, 너무 길어요`);
+    else if(lost>=T.lostWarn) up(1,`물속 ${sec}초째, 평소보다 길어요`);
+    if(d.shortRest) up(1,`물 위에서 ${d.restBefore}초만 쉬고 다시 들어감`);
+    if(lost>=T.lostWarn && d.last && d.last.rssi!=null && d.last.rssi<-85) r.push("들어가기 전 신호가 약했어요 (멀어져서 끊겼을 수도 있음)");
+    if(!r.length) r.push(`물질 중 · 물속 ${sec}초`);
+    return {level:lv,reasons:r};   // 물속에서는 마지막 측정값이 낡았으므로 아래 검사는 하지 않음
+  }
   const k=d.last;
   if(k.sos) up(3,"SOS 버튼을 눌렀음");
   if(k.fall && k.still>=T.fallStill) up(3,`충격 후 ${k.still}초 동안 움직임 없음`);
@@ -436,8 +462,28 @@ function evaluate(d){
   } else if(k.bpm===0) up(1,"맥박이 잡히지 않음 (센서 위치 확인)");
   if(k.temp<=T.tempDanger) up(2,`착용부 온도 ${k.temp}℃, 저체온 위험`);
   else if(k.temp<T.tempWarn) up(1,`착용부 온도 ${k.temp}℃, 추위 주의`);
-  if(!r.length) r.push("이상 없음");
+  if(!r.length) r.push(`휴식 중 · 물 위 ${Math.round((now()-d.surfacedAt)/1000)}초`);
   return {level:lv,reasons:r};
+}
+const SURF_GAP=4;   // 4초 넘게 신호가 없으면 물속으로 봄 (마이크로비트가 1초마다 보냄)
+const fmtSec=s=>s>=60?`${Math.floor(s/60)}분 ${s%60}초`:`${s}초`;
+// 상태 변화 추적: 물에 들어가는 순간 기록, 시간 띠용 기록
+function trackState(d){
+  if(!d.lastAt) return;
+  const under=(now()-d.lastAt)/1000>SURF_GAP;
+  if(under && !d.under){
+    d.under=true; d.diveStart=d.lastAt;
+    d.restBefore=Math.round((d.lastAt-(d.surfacedAt||d.lastAt))/1000);
+    const prev=d.dives[d.dives.length-1];
+    d.shortRest = !!(prev && prev.len>=60 && d.restBefore<S.t.minRest);
+  }
+  d.tl.push(under?1:0); if(d.tl.length>300) d.tl.shift();   // 최근 5분 (1초 단위)
+}
+function timeline(tl){
+  if(!tl.length) return "";
+  const W=300, x0=W-tl.length; let out="", i=0;
+  while(i<tl.length){ let j=i; while(j<tl.length&&tl[j]===tl[i]) j++; out+=`<rect x="${x0+i}" y="${tl[i]?0:6}" width="${j-i}" height="${tl[i]?14:2}" fill="${tl[i]?"var(--sea)":"var(--line)"}"/>`; i=j; }
+  return `<svg class="tl" viewBox="0 0 ${W} 14" preserveAspectRatio="none" aria-label="최근 5분 물속(짙은 막대)과 물 위">${out}</svg>`;
 }
 
 /* ================= 화면: 해녀 카드 ================= */
@@ -454,21 +500,24 @@ function renderDivers(){
   const box=$("divers"); const ids=[...divers.keys()].sort((a,b)=>a-b);
   if(!ids.length){ box.innerHTML=`<p class="note">아직 받은 신호가 없어요. 해녀용 마이크로비트를 켜거나 시뮬레이션을 켜세요.</p>`; return; }
   box.innerHTML=ids.map(id=>{
-    const d=divers.get(id), k=d.last||{}, lost=d.lastAt?Math.round((now()-d.lastAt)/1000):"-";
-    const bpm = k.bpm>0?k.bpm:(k.bpm===0?"--":"없음");
+    const d=divers.get(id), k=d.last||{}, lost=d.lastAt?Math.round((now()-d.lastAt)/1000):0;
+    const under=d.lastAt && lost>SURF_GAP;
+    const bpm = under?"–":(k.bpm>0?k.bpm:(k.bpm===0?"--":"없음"));
+    const last=d.dives[d.dives.length-1], maxDive=d.dives.reduce((m,x)=>Math.max(m,x.len),0);
     return `<article class="diver" data-lv="${d.level}">
       <div class="stripe"></div>
       <div class="diver-in">
         <div class="diver-top"><span class="diver-name">${esc(nameOf(id))}<small>#${id}</small></span><span class="pill lv${d.level}">${LV[d.level]}</span></div>
+        <div class="state ${under?"under":"surface"}"><b>${under?"물질 중":"휴식 중"}</b><span>${under?"물속":"물 위"} <span class="mono">${fmtSec(under?lost:Math.round((now()-(d.surfacedAt||now()))/1000))}</span></span></div>
+        ${timeline(d.tl)}
         <div class="metrics">
-          <div class="metric"><div class="k">맥박</div><div class="v">${bpm}<small>${k.bpm>0?"회/분":""}</small></div></div>
-          <div class="metric"><div class="k">착용부 온도</div><div class="v">${k.temp??"-"}<small>℃</small></div></div>
-          <div class="metric"><div class="k">무움직임</div><div class="v">${k.still??"-"}<small>초</small></div></div>
-          <div class="metric"><div class="k">마지막 신호</div><div class="v">${lost}<small>초 전</small></div></div>
+          <div class="metric"><div class="k">잠수 횟수</div><div class="v">${d.dives.length}<small>번</small></div></div>
+          <div class="metric"><div class="k">최근 잠수</div><div class="v">${last?last.len:"-"}<small>초</small></div></div>
+          <div class="metric"><div class="k">최장 잠수</div><div class="v">${maxDive||"-"}<small>초</small></div></div>
+          <div class="metric"><div class="k">맥박 (물 위)</div><div class="v">${bpm}<small>${!under&&k.bpm>0?"회/분":""}</small></div></div>
         </div>
-        ${spark(d.hist)}
         <ul class="reasons">${d.reasons.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
-        <div class="diver-foot"><span class="mono">물질 ${diveMinutes(d)}분째 · 신호 ${k.rssi??"-"}</span>${d.level>=2?`<button class="btn small" data-report="${id}">괜찮은지 확인</button>`:""}</div>
+        <div class="diver-foot"><span class="mono">오늘 작업 ${diveMinutes(d)}분째 · 신호 ${k.rssi??"-"}</span>${d.level>=2?`<button class="btn small" data-report="${id}">괜찮은지 확인</button>`:""}</div>
       </div></article>`;
   }).join("");
 }
@@ -479,6 +528,7 @@ $("divers").addEventListener("click",e=>{ const b=e.target.closest("[data-report
 function tick(){
   if(sim.on) simStep();
   for(const d of divers.values()){
+    trackState(d);
     const {level,reasons}=evaluate(d); d.level=level; d.reasons=reasons;
     if(level!==d.prevLevel){
       if(level>d.prevLevel && level>=1) log(`${nameOf(d.id)}: ${LV[level]} - ${reasons.join(", ")}`);
@@ -490,6 +540,7 @@ function tick(){
     if(level===3 && !d.reported && now()>d.ackUntil && !emg.active) openEmergency(d,false);
   }
   try{ agentWatch(); }catch(e){ console.warn(e); }
+  { const all=[...divers.values()].filter(d=>d.lastAt), u=all.filter(d=>d.under).length; $("stateSum").textContent=all.length?`물질 중 ${u}명 · 휴식 중 ${all.length-u}명`:""; }
   renderDivers();
   $("clock").textContent=hhmm();
 }
@@ -526,12 +577,27 @@ async function openEmergency(d, manual, via){
     agentPost(`🚨 ${nameOf(d.id)}님이 SOS 버튼을 눌렀어요. 본인이 도움을 요청한 것이라 확인 절차 없이 바로 신고 화면을 열었어요.`,"alert");
     emg.sent=false; doReport("SOS 버튼으로 본인이 직접 도움 요청"); return;
   }
-  emg.stage=1; emg.left=S.t.countdown;
+  emg.stage=1; emg.left=S.t.countdown; emg.under=d.under;
+  $("emgNote").textContent=d.under?"초 안에 물 위로 올라오지 않으면 비상 상황으로 판단해 해양경찰·119 신고 화면으로 넘어갑니다.":"초 안에 해녀가 버튼으로 응답하지 않으면 비상 상황으로 판단해 해양경찰·119 신고 화면으로 넘어갑니다.";
   $("emgTitle").textContent=`${nameOf(d.id)} 상태 확인 중`;
   $("emgWhy").textContent=`감지 내용: ${d.reasons.join(", ")}`;
   $("emgCount").textContent=emg.left;
-  $("emgMsg").textContent="해녀의 마이크로비트로 확인 신호를 보내는 중…";
   emgShow(1);
+  if(d.under){
+    // 물속이라 라디오가 닿지 않음 → 본인 확인 대신 주변 해녀에게 도움 신호, 올라오면 자동 해제
+    const ok=await sendLine(`H,${d.id}`);
+    $("emgMsg").textContent=`물속이라 ${nameOf(d.id)} 삼촌에게는 신호가 닿지 않아요. 주변 해녀들 마이크로비트에 도움 신호(${ok?"보냄":"못 보냄"})를 보내 근처를 살피게 했어요. 그 사이 물 위로 올라오면 자동으로 해제돼요.`;
+    log(`${nameOf(d.id)}: 물속 위급 → 주변 해녀에게 도움 신호 ${ok?"보냄":"못 보냄"}, ${emg.left}초 대기`);
+    agentPost(`⚠ ${nameOf(d.id)} 삼촌이 물속에서 ${fmtSec(Math.round((now()-d.lastAt)/1000))}째 안 올라와요. 물속이라 본인 확인이 안 돼서 주변 해녀들에게 도움 신호를 보냈어요. ${emg.left}초 안에 올라오지 않으면 비상으로 판단하고 신고할게요.`,"alert");
+    clearInterval(emg.timer);
+    emg.timer=setInterval(()=>{
+      emg.left--; $("emgCount").textContent=Math.max(0,emg.left);
+      if(emg.left%5===0 && emg.left>0) beep(988,200,1);
+      if(emg.left<=0){ clearInterval(emg.timer); log(`${nameOf(d.id)}: ${S.t.countdown}초 더 기다려도 안 올라옴 → 비상 상황으로 판단`); doReport(`물속에서 안 올라옴 (신호 끊긴 지 ${Math.round((now()-d.lastAt)/1000)}초)`); }
+    },1000);
+    return;
+  }
+  $("emgMsg").textContent="해녀의 마이크로비트로 확인 신호를 보내는 중…";
   emg.sent=await sendToDiver(d.id);
   $("emgMsg").textContent = emg.sent
     ? "확인 신호를 보냈어요. 해녀의 마이크로비트가 소리와 불빛으로 알리고 있어요. 해녀가 버튼을 누르면 가짜 경보로 처리합니다."
@@ -546,6 +612,17 @@ async function openEmergency(d, manual, via){
       log(`${nameOf(d.id)}: ${S.t.countdown}초 동안 응답 없음 → 비상 상황으로 판단`);
       doReport(`확인 신호에 ${S.t.countdown}초 동안 응답 없음`); }
   },1000);
+}
+function onSurface(id,len){
+  const d=divers.get(id); if(!d||!(emg.active && emg.diver===d && emg.stage===1)) return;
+  clearInterval(emg.timer); d.ackUntil=now()+60000;
+  if(sim.on && sim.st[id] && sim.st[id].scenario!=="normal"){ sim.st[id].scenario="normal"; renderSim(); }
+  $("emgTitle").textContent=`${nameOf(id)} 올라왔어요`;
+  $("emgOk").textContent=`${nameOf(id)} 삼촌이 ${len}초 잠수 후 물 위로 올라와 신호가 다시 잡혔어요. 신고하지 않았어요. 오래 잠수했으니 물 위에서 충분히 쉬게 해 주세요.`;
+  emgShow(0); emg.stage=0;
+  log(`${nameOf(id)}: 물 위로 올라와 비상 해제 (${len}초 잠수)`);
+  agentPost(`✅ ${nameOf(id)} 삼촌이 ${len}초 만에 올라왔어요. 신고는 멈췄어요. 이번 잠수가 길었으니 최소 ${Math.max(S.t.minRest,Math.round(len/2))}초는 물 위에서 쉬게 해 주세요.`);
+  setTimeout(()=>{ if(emg.diver===d && emg.stage===0) closeEmg(); },5000);
 }
 function onAck(id){
   const d=divers.get(id); if(!d) return;
@@ -607,18 +684,28 @@ function emgStatus(){
 }
 
 /* ================= 시뮬레이터 ================= */
-const SCEN={normal:"정상 물질",dive:"잠수 중 (신호 끊김)",hr:"맥박 이상",cold:"저체온",fakefall:"넘어졌지만 괜찮음 (응답함)",fall:"쓰러짐 (응답 없음)",sos:"SOS 버튼",long:"오래 물질 (시간 초과)"};
+const SCEN={normal:"정상 물질 (잠수·휴식 반복)",dive:"물속에서 안 올라옴",longdive:"오래 잠수 후 올라옴",hr:"맥박 이상",cold:"저체온",fakefall:"넘어졌지만 괜찮음 (응답함)",fall:"쓰러짐 (응답 없음)",sos:"SOS 버튼",long:"오래 물질 (시간 초과)"};
 const sim={on:true, st:{1:{scenario:"normal",still:0,phase:0},2:{scenario:"normal",still:0,phase:3},3:{scenario:"hr",still:0,phase:6}}};
 function renderSim(){
   $("simGrid").innerHTML=Object.keys(sim.st).map(id=>`<label>${esc(nameOf(+id))}<select data-sim="${id}">${Object.entries(SCEN).map(([k,v])=>`<option value="${k}" ${sim.st[id].scenario===k?"selected":""}>${v}</option>`).join("")}</select></label>`).join("");
 }
-$("simGrid").addEventListener("change",e=>{ const s=e.target.closest("[data-sim]"); if(!s) return; const st=sim.st[s.dataset.sim]; st.scenario=s.value; st.still=0; st.longSet=false; const d=divers.get(+s.dataset.sim); if(d) d.ackUntil=0; });
+$("simGrid").addEventListener("change",e=>{ const s=e.target.closest("[data-sim]"); if(!s) return; const st=sim.st[s.dataset.sim]; st.scenario=s.value; st.still=0; st.longSet=false; st.jumped=false; if(s.value!=="normal") st.cyc=null; const d=divers.get(+s.dataset.sim); if(d) d.ackUntil=0; });
 $("simOn").addEventListener("change",e=>{ sim.on=e.target.checked; setConn(); });
 function rnd(a,b){ return a+Math.random()*(b-a); }
 function simStep(){
   for(const [id,st] of Object.entries(sim.st)){
     st.phase++;
+    const d0=divers.get(+id), t=now();
+    // 물속에서 안 올라옴 / 오래 잠수: 시연이 길어지지 않게 이미 오래 잠수한 것처럼 시작
+    if((st.scenario==="dive"||st.scenario==="longdive") && !st.jumped && d0){ d0.lastAt=t-(S.t.lostCrit-15)*1000; d0.under=false; trackState(d0); st.jumped=true; st.upAt=t+(15+Math.round(S.t.countdown/2))*1000; }
     if(st.scenario==="dive") continue;            // 물속: 신호 안 옴
+    if(st.scenario==="longdive"){ if(t<st.upAt) continue; st.scenario="normal"; st.cyc={under:false,until:t+30000}; renderSim(); }
+    // 평소: 물속(신호 없음) 35~75초, 물 위 20~40초를 반복
+    if(["normal","hr","cold","long"].includes(st.scenario)){
+      if(!st.cyc) st.cyc={under:false, until:t+rnd(3,20)*1000};
+      if(t>st.cyc.until){ st.cyc.under=!st.cyc.under; st.cyc.until=t+(st.cyc.under?rnd(35,75):rnd(20,40))*1000; }
+      if(st.cyc.under) continue;
+    }
     if(st.scenario==="long" && !st.longSet){ const d=divers.get(+id), g=seaGuide(); if(d){ d.sessionStart=now()-((g?.diveMin||60)+3)*60000; d.nudged=false; st.longSet=true; } }
     let temp=Math.round(rnd(16.5,18.2)), bpm=Math.round(rnd(72,96)+6*Math.sin(st.phase/5)), fall=0, sos=0;
     if(st.scenario==="fall"||st.scenario==="fakefall"){ fall=1; st.still++; bpm=st.scenario==="fall"?Math.round(rnd(46,54)):bpm; }
@@ -826,7 +913,10 @@ function setMode(){ $("agentMode").textContent=aiReady()?`Gemini · ${S.ai.model
 function diversStatus(){
   return [...divers.values()].sort((a,b)=>a.id-b.id).map(d=>({id:d.id,name:nameOf(d.id),level:LV[d.level],reasons:d.reasons,
     bpm:d.last?.bpm>0?d.last.bpm:null,temp:d.last?.temp??null,still_sec:d.last?.still??null,
-    seconds_since_signal:d.lastAt?Math.round((now()-d.lastAt)/1000):null, dive_min:diveMinutes(d)}));
+    seconds_since_signal:d.lastAt?Math.round((now()-d.lastAt)/1000):null, dive_min:diveMinutes(d),
+    state:d.lastAt?(d.under?"물질 중(물속)":"휴식 중(물 위)"):"신호 없음", under_sec:d.under?Math.round((now()-d.lastAt)/1000):0,
+    rest_sec:!d.under&&d.surfacedAt?Math.round((now()-d.surfacedAt)/1000):0, dives:d.dives.length,
+    last_dive:d.dives.length?d.dives[d.dives.length-1].len:null, max_dive:d.dives.reduce((m,x)=>Math.max(m,x.len),0)}));
 }
 const STATION_LIST=STATIONS.map(s=>s.name).join(", ");
 const TOOLS=[{functionDeclarations:[
@@ -881,6 +971,7 @@ async function sendLine(line){
 async function recallDiver(id, reason, by){
   const ids = id ? [id] : [...divers.keys()];
   const ok = await sendLine(`R,${id||0}`);
+  ids.forEach(i=>{ const d=divers.get(i); if(d && d.under) d.pendingRecall=true; });   // 물속이면 올라올 때 다시 보냄
   const g=seaGuide();
   ids.forEach(i=>{
     const d=divers.get(i); if(!d) return;
@@ -971,7 +1062,7 @@ function agentWatch(){
       const why=sayReason(d.reasons[0]);
       if(AG.auto && d.level===2){
         recallDiver(d.id,d.reasons[0],"자율 모드");
-        agentNotice(`${nameOf(d.id)} 삼촌 ${why} 위험 단계라 쉬러 나오라는 신호를 바로 보냈어요. 응답이 없으면 괜찮은지 확인할게요.`,
+        agentNotice(d.under?`${nameOf(d.id)} 삼촌 ${why} 물속이라 신호가 안 닿아서, 올라오는 순간 쉬러 나오라는 신호가 가도록 해 뒀어요. 더 길어지면 주변 해녀에게 도움 신호를 보낼게요.`:`${nameOf(d.id)} 삼촌 ${why} 위험 단계라 쉬러 나오라는 신호를 바로 보냈어요. 응답이 없으면 괜찮은지 확인할게요.`,
           [["지금 괜찮은지 확인",()=>openEmergency(d,true,"에이전트 제안")]], ["관찰: 상태 변화","판단: 위험","행동: 휴식 신호"]);
       } else {
         agentNotice(`${nameOf(d.id)} 삼촌 ${why} ${d.level===2?"위험 단계예요.":"아직은 주의 단계라 지켜보고 있어요."} 쉬라고 할까요?`,
@@ -1045,6 +1136,12 @@ const SYSTEM=()=>{
 - 위험이 분명하거나 물질 시간이 기준을 넘긴 해녀가 있으면, 질문과 상관없어도 마지막에 짧게 알리고 신호를 보낼지 제안한다(자율 모드면 바로 보낸다).
 - 기억한 메모는 판단에 반영한다 (예: 무릎이 안 좋은 삼촌은 물질 시간을 더 짧게).
 
+[해녀 상태를 아는 방법]
+- 라디오 신호가 끊기면 물질 중(물속), 다시 잡히면 휴식 중(물 위)이다. 끊겨 있던 시간이 한 번의 잠수 시간이다.
+- 물속 ${S.t.lostWarn}초 넘으면 주의, ${S.t.lostDanger}초 위험, ${S.t.lostCrit}초 위급. 긴 잠수 뒤 물 위에서 ${S.t.minRest}초도 안 쉬고 다시 들어가면 주의.
+- 물속에서는 신호가 닿지 않아 확인 신호를 못 받는다. 위급하면 주변 해녀에게 도움 신호를 보내고, 올라오면 자동 해제된다. 휴식 신호는 올라올 때 전달된다.
+- 맥박·온도는 물 위에 있을 때 값만 믿는다.
+
 [판단 규칙]
 - 오늘 물질 여부는 아래 '물질 가이드'와 수온 판정을 그대로 따른다. 가이드의 물질 시간·휴식 시간을 그대로 인용한다.
 - 며칠 뒤는 get_sea_forecast. 이 예보는 4~10일 뒤만 있다. 1~3일 뒤는 "아직 예보가 없어요, 전날 저녁에 다시 물어보세요"라고 한다. 파고 2.5m 이상은 주의, 3m 이상은 쉬는 날.
@@ -1066,7 +1163,7 @@ const SYSTEM=()=>{
 오늘(한국 시각): ${kstNow().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})} ${kstNow().getHours()}시. 고른 바다: ${station(S.site)?.name||S.site}.
 오늘 수온: ${sea?`${sea.site} ${sea.temp}℃ (관측 ${sea.obsTime||"시각 모름"}), 판정 ${sea.verdict}`:"아직 없음(도구 사용)"}
 물질 가이드(앱 기준): ${g?`${g.call} · ${g.dive} · ${g.rest} · ${g.tip}`:"수온이 있어야 나옴"}
-해녀 ${ds.length}명: ${ds.length?ds.map(d=>`${d.name} ${d.level}${d.level!=="정상"?"("+d.reasons.join(", ")+")":""}${d.bpm?` 맥박 ${d.bpm}`:""}${d.seconds_since_signal!=null&&d.seconds_since_signal>20?` 신호끊김 ${d.seconds_since_signal}초`:""}`).join(" / "):"신호 없음"}
+해녀 ${ds.length}명: ${ds.length?ds.map(d=>`${d.name} ${d.state} ${d.under_sec?`물속 ${d.under_sec}초째`:`물 위 ${d.rest_sec}초째`}, 잠수 ${d.dives}번(최근 ${d.last_dive??"-"}초, 최장 ${d.max_dive||"-"}초), ${d.level}${d.level!=="정상"?"("+d.reasons.join(", ")+")":""}${d.bpm?` 맥박 ${d.bpm}`:""}${d.seconds_since_signal!=null&&d.seconds_since_signal>20?` 신호끊김 ${d.seconds_since_signal}초`:""}`).join(" / "):"신호 없음"}
 살펴볼 사람: ${bad.length?bad.map(d=>d.name).join(", "):"없음"}
 해녀 번호: ${ds.map(d=>`${d.id}=${d.name}`).join(", ")} · 물질 시간: ${ds.map(d=>`${d.name} ${d.dive_min}분째`).join(", ")}${g&&g.diveMin?` (오늘 기준 한 번 ${g.diveMin}분)`:""}
 자율 모드: ${AG.auto?"켜짐(위험·시간 초과 시 직접 휴식 신호)":"꺼짐(제안만)"}
@@ -1079,6 +1176,8 @@ const wv=d=>d.waveMin===d.waveMax?`${d.waveMax}m`:`${d.waveMin}~${d.waveMax}m`;
 function sayReason(r){
   r=String(r||"").replace(/\s*\(.*\)$/,"");
   const m=r.match(/^맥박 (\d+)/); if(m) return `맥박이 ${m[1]}회로 ${+m[1]>=100?"높아요":"낮아요"}.`;
+  const u=r.match(/^물속 (\d+)초째/); if(u) return `물속에 ${fmtSec(+u[1])}째 있어요.`;
+  const q=r.match(/^물 위에서 (\d+)초만 쉬고/); if(q) return `물 위에서 ${q[1]}초만 쉬고 다시 들어갔어요.`;
   return r.replace(/회\/분/,"회")+".";
 }
 // AI 답에서 기계적인 표현을 걷어냄
@@ -1207,7 +1306,7 @@ $("btnClearLog").onclick=()=>{ $("log").innerHTML=""; };
 
 /* ================= 설정 화면 ================= */
 const F={aiKey:["ai","key"],aiModel:["ai","model"],wKey:["water","key"],wTempPath:["water","tempPath"],
-  tLostWarn:["t","lostWarn",1],tLostDanger:["t","lostDanger",1],tLostCrit:["t","lostCrit",1],tFallStill:["t","fallStill",1],tStillWarn:["t","stillWarn",1],tCountdown:["t","countdown",1],
+  tLostWarn:["t","lostWarn",1],tLostDanger:["t","lostDanger",1],tLostCrit:["t","lostCrit",1],tMinRest:["t","minRest",1],tFallStill:["t","fallStill",1],tStillWarn:["t","stillWarn",1],tCountdown:["t","countdown",1],
   tSeaMin:["t","seaMin",1],tSeaWarn:["t","seaWarn",1],tWaveMax:["t","waveMax",1],rPlace:["report","place"],rPhone:["report","phone"],rLat:["report","lat"],rLon:["report","lon"]};
 $("btnSettings").onclick=()=>{
   for(const [id,[a,b]] of Object.entries(F)) $(id).value=S[a][b]??"";

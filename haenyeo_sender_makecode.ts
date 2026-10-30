@@ -18,6 +18,7 @@ let sos = 0          // 1이면 해녀가 직접 SOS 요청
 let fall = 0         // 1이면 자유낙하 또는 강한 충격 감지
 let asking = false   // true면 관제(AI 에이전트)가 "괜찮으세요?" 확인 중
 let recallUntil = 0  // 이 시각까지 "쉬러 나오세요" 알림
+let helpUntil = 0    // 이 시각까지 "동료가 위험해요" 알림
 let lastMove = input.runningTime()
 let bpm = -1         // 맥박 센서가 없으면 -1
 let lastBeat = 0
@@ -34,16 +35,26 @@ input.onGesture(Gesture.SixG, function () {
 // 관제(AI 에이전트)에서 오는 신호
 //  Q,번호 : 괜찮으세요? → 소리·놀란 얼굴, A나 B 버튼으로 응답
 //  R,번호 / R,0 : 쉬러 나오세요 → 위쪽 화살표와 낮은 소리 10초
+//  H,번호 : 다른 해녀가 물속에서 안 올라와요 → 내가 그 해녀가 아니면 경고 표시와 높은 소리 15초 (근처를 살펴 주세요)
 radio.onReceivedString(function (s) {
     if (s == "Q," + DIVER_ID) {
         asking = true
     } else if (s == "R," + DIVER_ID || s == "R,0") {
         recallUntil = input.runningTime() + 10000
+    } else if (s.indexOf("H,") == 0 && s != "H," + DIVER_ID) {
+        helpUntil = input.runningTime() + 15000
     }
 })
 control.inBackground(function () {
     while (true) {
-        if (!asking && input.runningTime() < recallUntil) {
+        if (!asking && input.runningTime() < helpUntil) {
+            basic.showIcon(IconNames.Skull)
+            music.playTone(Note.C6, music.beat(BeatFraction.Quarter))
+            music.playTone(Note.A5, music.beat(BeatFraction.Quarter))
+            basic.pause(200)
+            basic.clearScreen()
+            basic.pause(200)
+        } else if (!asking && input.runningTime() < recallUntil) {
             basic.showArrow(ArrowNames.North)
             music.playTone(Note.G4, music.beat(BeatFraction.Half))
             basic.pause(300)
@@ -132,14 +143,16 @@ if (PULSE_SENSOR) {
     })
 }
 
-// 1초마다 전송. 라디오 문자열은 최대 19글자라서 짧게 보냅니다.
+// 1초마다 전송 (꼭 1초 간격 유지: 관제는 4초 넘게 안 오면 물속으로 판단)
+// 물에 들어가면 라디오가 끊기고, 올라오면 다시 잡힙니다. 그 끊긴 시간이 잠수 시간이에요.
+// 라디오 문자열은 최대 19글자라서 짧게 보냅니다.
 // 형식: 번호,온도,맥박,쓰러짐,무움직임초,SOS   예) 1,18,72,0,3,0
 basic.forever(function () {
     let still = Math.idiv(input.runningTime() - lastMove, 1000)
     if (still > 999) still = 999
     const msg = DIVER_ID + "," + input.temperature() + "," + bpm + "," + fall + "," + still + "," + sos
     radio.sendString(msg)
-    if (sos == 0 && fall == 0 && !asking && input.runningTime() >= recallUntil) {
+    if (sos == 0 && fall == 0 && !asking && input.runningTime() >= recallUntil && input.runningTime() >= helpUntil) {
         led.toggle(2, 2)   // 가운데 불빛이 깜빡이면 정상 전송 중
     }
     basic.pause(1000)
