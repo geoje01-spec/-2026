@@ -43,9 +43,17 @@ function normalize(it) {
     grade: pick(it, [/grd_nm/i, /등급명/]),
     unit: pick(it, [/^unit$/i, /unit_nm/i, /^단위$/]),
     size: pick(it, [/unit_sz/i, /sz/i, /단위크기/]),
-    perKg: kgPrice(it),
+    perKg: null,
+    perUnit: kgPrice(it),     // 환산 가격 = 판매 단위 1개당 (단위가 kg이면 kg당)
     price: unitPrice(it),
   };
+}
+// 단위가 kg·g일 때만 kg당 가격으로 씀 (마리·개 단위는 kg으로 바꿀 수 없음)
+function withKg(r) {
+  const u = String(r.unit || "").trim().toLowerCase();
+  if (r.perUnit && u === "kg") r.perKg = r.perUnit;
+  else if (r.perUnit && u === "g") r.perKg = Math.round(r.perUnit * 1000);
+  return r;
 }
 async function call(key, extra, op) {
   const qs = new URLSearchParams({ pageNo: "1", numOfRows: "1000", returnType: "json", ...extra }).toString();
@@ -66,11 +74,11 @@ module.exports = async (req, res) => {
   if (!raw && cache.data && Date.now() - cache.at < 3 * 3600 * 1000) return res.status(200).json(cache.data);
   const log = [];
   const done = (items, how) => {
-    const rows = items.map(normalize).filter((r) => r.item && (r.perKg || r.price));
+    const rows = items.map(normalize).map(withKg).filter((r) => r.item && (r.perKg || r.perUnit || r.price));
     const fish = rows.filter((r) => /수산/.test(r.cls || "") || /^6/.test(String(r.clsCd || "")));
     const data = { ok: true, source: "aT 최근일자 도·소매가격", how, op: OP, date: (fish[0] || rows[0] || {}).date || null, rows: fish.length ? fish : rows, filtered: !!fish.length };
     cache = { at: Date.now(), data };
-    if (raw) return res.status(200).json({ how, 기능: OP, 원본_예시: items.slice(0, 5), 해석_예시: items.slice(0, 5).map(normalize), 수산물_건수: fish.length, log });
+    if (raw) return res.status(200).json({ how, 기능: OP, 원본_예시: items.slice(0, 5), 해석_예시: items.slice(0, 5).map(normalize).map(withKg), 수산물_건수: fish.length, 품목: [...new Set(fish.map((r) => r.item))], kg단위_품목: [...new Set(fish.filter((r) => r.perKg).map((r) => r.item))], log });
     return res.status(200).json(data);
   };
   try {
