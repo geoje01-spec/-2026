@@ -2,6 +2,8 @@
 // 키는 Vercel 환경변수 DATA_GO_KEY (숨비 지킴이 수온 API와 같은 공공데이터포털 키)
 // 응답 항목 이름이 문서에 공개돼 있지 않아서, 이름을 보고 자동으로 찾음. 확인용: /api/price?raw=1
 const BASE = "https://apis.data.go.kr/B552845/recent";
+const OPS = ["/price", "/prices", "/list", ""];   // 기능 이름 후보 (같은 기관 perDay API는 /price)
+let OP = null;   // 찾은 기능 이름 기억
 let cache = { at: 0, data: null };
 
 function findItems(o) {
@@ -45,9 +47,9 @@ function normalize(it) {
     price: unitPrice(it),
   };
 }
-async function call(key, extra) {
+async function call(key, extra, op) {
   const qs = new URLSearchParams({ pageNo: "1", numOfRows: "1000", returnType: "json", ...extra }).toString();
-  const r = await fetch(`${BASE}?serviceKey=${key}&${qs}`, { headers: { Accept: "application/json" } });
+  const r = await fetch(`${BASE}${op ?? OP ?? ""}?serviceKey=${key}&${qs}`, { headers: { Accept: "application/json" } });
   const text = await r.text();
   let j = null; try { j = JSON.parse(text); } catch (e) {}
   return { status: r.status, j, text };
@@ -66,12 +68,21 @@ module.exports = async (req, res) => {
   const done = (items, how) => {
     const rows = items.map(normalize).filter((r) => r.item && (r.perKg || r.price));
     const fish = rows.filter((r) => /수산/.test(r.cls || "") || /^6/.test(String(r.clsCd || "")));
-    const data = { ok: true, source: "aT 최근일자 도·소매가격", how, date: (fish[0] || rows[0] || {}).date || null, rows: fish.length ? fish : rows, filtered: !!fish.length };
+    const data = { ok: true, source: "aT 최근일자 도·소매가격", how, op: OP, date: (fish[0] || rows[0] || {}).date || null, rows: fish.length ? fish : rows, filtered: !!fish.length };
     cache = { at: Date.now(), data };
-    if (raw) return res.status(200).json({ how, 원본_예시: items.slice(0, 5), 해석_예시: items.slice(0, 5).map(normalize), 수산물_건수: fish.length, log });
+    if (raw) return res.status(200).json({ how, 기능: OP, 원본_예시: items.slice(0, 5), 해석_예시: items.slice(0, 5).map(normalize), 수산물_건수: fish.length, log });
     return res.status(200).json(data);
   };
   try {
+    // 0) 기능 이름 찾기: 오류 12(서비스 없음)가 아닌 주소가 맞는 주소
+    if (OP === null) {
+      for (const op of OPS) {
+        const t = await call(key, { "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": "611" }, op);
+        log.push({ 기능: op || "(없음)", status: t.status, 응답: t.text.slice(0, 300) });
+        if (!/NO_OPENAPI_SERVICE|returnReasonCode"\s*:\s*"12"/.test(t.text)) { OP = op; break; }
+      }
+      if (OP === null) return res.status(502).json({ error: "API 주소(기능 이름)를 찾지 못했어요", log });
+    }
     // 1) 부류만 주고 한 번에 받기
     for (const extra of [{ "cond[ctgry_cd::EQ]": "600" }, {}]) {
       const { status, j, text } = await call(key, extra);
