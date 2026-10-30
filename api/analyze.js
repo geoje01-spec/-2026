@@ -41,16 +41,24 @@ ${VARIETY_GUIDE}
  "notes": 해녀 어르신이 읽을 쉬운 한국어 한두 문장 (확인할 점, 깨진 껍데기·상처가 있으면 그것도),
  "promo": 손님에게 알리는 홍보 글. 제주 해녀 어르신의 따뜻한 말투로 2~3문장, 세부 품종 이름과 싱싱함을 살려서. 가격·전화번호·이모지·해시태그는 넣지 말 것}`;
 
-async function call(model, key, body) {
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ inlineData: { mimeType: body.mime || "image/jpeg", data: body.image } }, { text: PROMPT }] }],
-      generationConfig: { temperature: 0.2, responseMimeType: "application/json" },
-    }),
-  });
-  return { status: r.status, json: await r.json().catch(() => ({})) };
+// 모델 하나를 시간 제한을 두고 부름 (생각 단계를 줄여 빠르게, 거부되면 그 설정 없이 다시)
+async function call(model, key, body, ms, think = true) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    const generationConfig = { temperature: 0.2, responseMimeType: "application/json" };
+    if (think) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST", signal: ctl.signal,
+      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ inlineData: { mimeType: body.mime || "image/jpeg", data: body.image } }, { text: PROMPT }] }], generationConfig }),
+    });
+    const json = await r.json().catch(() => ({}));
+    if (r.status === 400 && think && /think/i.test(json.error?.message || "")) return call(model, key, body, ms, false);
+    return { status: r.status, json, model };
+  } catch (e) {
+    return { status: 504, json: { error: { message: e.name === "AbortError" ? `${model} 응답이 ${ms / 1000}초 넘게 걸림` : e.message } }, model };
+  } finally { clearTimeout(timer); }
 }
 
 module.exports = async (req, res) => {
@@ -61,12 +69,13 @@ module.exports = async (req, res) => {
   if (!body.image) return res.status(400).json({ error: "사진이 없어요" });
   try {
     // 세부 품종 구분은 정확도가 중요해서 Flash를 먼저, 안 되면(사용량 초과 등) 가벼운 Flash-Lite
-    let out = await call("gemini-flash-latest", key, body);
-    if (out.status !== 200) out = await call("gemini-flash-lite-latest", key, body);
-    if (out.status !== 200) return res.status(out.status).json({ error: out.json.error?.message || "Gemini 오류" });
+    const tried = [];
+    let out = await call("gemini-flash-latest", key, body, 25000);
+    if (out.status !== 200) { tried.push(out.json.error?.message || out.status); out = await call("gemini-flash-lite-latest", key, body, 20000); }
+    if (out.status !== 200) { tried.push(out.json.error?.message || out.status); return res.status(502).json({ error: "Gemini 오류: " + tried.join(" / ") }); }
     const text = (out.json.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
     const ai = JSON.parse(text.replace(/^```(json)?|```$/g, "").trim());
-    res.status(200).json({ ai });
+    res.status(200).json({ ai, model: out.model });
   } catch (e) {
     res.status(502).json({ error: "사진 판별 실패: " + e.message });
   }

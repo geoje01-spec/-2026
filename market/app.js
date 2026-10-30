@@ -405,8 +405,8 @@
     if (CONFIG.gemini) {
       try {
         const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ image: big.split(',')[1], mime: 'image/jpeg' }) });
-        const j = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(j.error || '사진 판별 서버 오류');
+        const txt = await res.text(); let j = {}; try { j = JSON.parse(txt); } catch { /* 오류 화면 */ }
+        if (!res.ok) throw new Error(j.error || `서버 응답 ${res.status}${/TIMEOUT/i.test(txt) ? ', 시간 초과' : ''}${/PAYLOAD|too large/i.test(txt) ? ', 사진이 너무 큼' : ''}`);
         return j.ai || {};
       } catch (e) {
         return { demo: true, species: 'abalone', estWeightKg: 1, grade: '상', freshness: '좋음', confidence: 0, notes: '사진 판별에 실패했어요(' + e.message + '). 아래에서 직접 골라 주세요.' };
