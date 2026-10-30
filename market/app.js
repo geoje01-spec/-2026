@@ -159,7 +159,7 @@
       ${p.promo ? `<p class="promo">${esc(p.promo)}</p>` : ''}
       <div class="row between" style="align-items:flex-end">
         ${p.askPerKg ? `<div class="price num" style="font-size:32px">${won(p.askPerKg).replace('원', '')}<small>원 / kg</small></div>` : '<strong>가격은 연락해서 물어보세요</strong>'}
-        <span class="muted small">참고 시세 kg당 ${won(p.refPerKg)}${p.refLive ? ' (aT)' : ''}</span>
+        ${p.refPerKg ? `<span class="muted small">참고 시세 kg당 ${won(p.refPerKg)}${p.refLive ? ' (aT)' : ''}</span>` : ''}
       </div>
       ${owner ? ownerBtns : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 연락해 보세요.</p>' + contact(p.author, A.label(p.species, p.variety)) : contact(p.author, A.label(p.species, p.variety)))}
     </article>`;
@@ -212,7 +212,8 @@
         ${d.ai.basis ? `<p class="muted small" style="margin:0">구분 근거: ${esc(d.ai.basis)}</p>` : ''}
         ${Array.isArray(d.ai.others) && d.ai.others.length ? `<p class="muted small" style="margin:0">함께 보여요: ${esc(d.ai.others.map((o) => (o.name || '') + (o.count ? ' ' + o.count + '개' : '')).join(', '))}. 따로 올리려면 다시 찍어 주세요.</p>` : ''}
         <h3>품목</h3>
-        <div class="chips">${Object.entries(SP).map(([k, v]) => `<button type="button" class="chip" data-act="d-species" data-v="${k}" aria-pressed="${k === d.species}">${esc(v.ko)}</button>`).join('')}</div>
+        <div class="chips">${Object.entries(SP).map(([k, v]) => `<button type="button" class="chip" data-act="d-species" data-v="${k}" aria-pressed="${k === d.species}">${k === 'other' ? '기타 (직접 입력)' : esc(v.ko)}</button>`).join('')}</div>
+        ${d.species === 'other' ? `<label class="field" for="other-name">해산물 이름 ${d.ai.variety && d.ai.species === 'other' ? '<span class="muted small" style="font-weight:400">AI가 본 이름, 맞는지 봐 주세요</span>' : ''}<input type="text" id="other-name" value="${esc(d.variety || '')}" placeholder="예: 가리비, 낙지, 오징어"></label>` : ''}
         ${(() => { const list = (A.VARIETIES[d.species] || []).slice(); if (d.variety && !list.includes(d.variety)) list.unshift(d.variety); return list.length ? `<h3>세부 품종 <span class="muted small" style="font-weight:400">${d.ai.variety ? 'AI가 고른 값, 맞는지 봐 주세요' : '아는 경우만 골라 주세요'}</span></h3>
         <div class="chips">${list.map((v) => `<button type="button" class="chip" data-act="d-variety" data-v="${esc(v)}" aria-pressed="${v === d.variety}">${esc(v)}</button>`).join('')}<button type="button" class="chip" data-act="d-variety" data-v="" aria-pressed="${!d.variety}">모름</button></div>` : ''; })()}
         <h3>등급</h3>
@@ -231,7 +232,7 @@
         ${d.askPerKg != null ? `
           <div class="price num">${won(d.askPerKg).replace('원', '')}<small>원 / kg</small></div>
           <div class="row"><button type="button" class="btn sm" data-act="d-adj" data-v="-1000">1,000원 내리기</button><button type="button" class="btn sm" data-act="d-adj" data-v="1000">1,000원 올리기</button></div>` : ''}
-        <p class="muted small" style="margin:0">추천 값은 kg당 ${won(ref)}이에요. ${esc(A.marketNote(d.species))} 값은 손님과 직접 정하셔도 돼요.</p>
+        <p class="muted small" style="margin:0">${ref ? `추천 값은 kg당 ${won(ref)}이에요. ${esc(A.marketNote(d.species, d.variety))} 값은 손님과 직접 정하셔도 돼요.` : esc(A.marketNote(d.species, d.variety))}</p>
       </section>
       <section class="card">
         <div class="row between"><div class="eyebrow">홍보 글</div><button type="button" class="btn sm" data-act="rewrite" ${d.rewriting ? 'disabled' : ''}>${d.rewriting ? '쓰는 중…' : 'AI가 다시 쓰기'}</button></div>
@@ -430,7 +431,7 @@
         status: 'ready', ai, species: ai.species, variety: (typeof ai.variety === 'string' && ai.variety.trim() && !/모름|없음|unknown/i.test(ai.variety)) ? ai.variety.trim().slice(0, 20) : null, grade: ai.grade, freshness: ai.freshness,
         weightKg: Math.max(0.5, Math.round((ai.estWeightKg || 1) * 2) / 2)
       });
-      d.askPerKg = A.refPrice(d);
+      d.askPerKg = A.refPrice(d) || null;
       d.promo = ai.promo || A.promo(Object.assign({ author: ui.me }, d));
     } catch (e) { d.status = 'error'; d.error = e.message; }
     render();
@@ -478,9 +479,11 @@
   /* ---------- 동작 ---------- */
   document.addEventListener('change', (e) => {
     if (e.target.id === 'cam' && e.target.files[0]) onPhoto(e.target.files[0]);
+    if (e.target.id === 'other-name') { const d = ui.draft; d.variety = e.target.value.trim() || null; if (d.askPerKg != null) d.askPerKg = A.refPrice(d) || d.askPerKg; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); }
   });
   document.addEventListener('input', (e) => {
     if (e.target.id === 'promo') ui.draft.promo = e.target.value;
+    if (e.target.id === 'other-name') ui.draft.variety = e.target.value.trim() || null;
     if (e.target.id === 'rv-text') { ui.rv.text = e.target.value; $('#rv-detect').innerHTML = detectLine(e.target.value); }
   });
   document.addEventListener('click', (e) => {
@@ -498,11 +501,12 @@
       case 'd-grade': d.grade = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); render(); break;
       case 'd-fresh': d.freshness = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); render(); break;
       case 'd-w': d.weightKg = Math.max(0.5, Math.round((d.weightKg + +v) * 10) / 10); render(); break;
-      case 'd-ask': d.askPerKg = v === 'on' ? A.refPrice(d) : null; render(); break;
+      case 'd-ask': d.askPerKg = v === 'on' ? (A.refPrice(d) || 10000) : null; render(); break;
       case 'd-adj': d.askPerKg = Math.max(1000, d.askPerKg + +v); render(); break;
       case 'rewrite': run(rewrite); break;
       case 'publish': {
         const ta = $('#promo'); if (ta) d.promo = ta.value.trim();
+        if (d.species === 'other' && !d.variety) { toast('해산물 이름을 적어 주세요.'); break; }
         if (!ui.me.name || !ui.me.phone) { toast('손님이 연락할 이름과 전화번호를 먼저 적어 주세요.'); ui.tab.h = 'me'; render(); break; }
         b.disabled = true;
         run(async () => {
@@ -510,10 +514,10 @@
             const post = {
               id: A.uid('p'), ownerId: DEV, author: Object.assign({}, ui.me),
               species: d.species, variety: d.variety || null, grade: d.grade, freshness: d.freshness, weightKg: d.weightKg,
-              refPerKg: A.refPrice(d), refLive: A.basePerKg(d.species).live, askPerKg: d.askPerKg, photo: d.photo || null,
+              refPerKg: A.refPrice(d), refLive: A.basePerKg(d.species, d.variety).live, askPerKg: d.askPerKg, photo: d.photo || null,
               promo: d.promo, createdAt: new Date().toISOString(), status: 'open'
             };
-            const ws = s.wants.filter((w) => !w.matchedPostId && (w.species || []).includes(post.species));
+            const ws = s.wants.filter((w) => !w.matchedPostId && ((w.species || []).includes(post.species) || (post.species === 'other' && post.variety && String(w.text || '').includes(post.variety))));
             if (ws.length) { post.earlyUntil = new Date(Date.now() + A.EARLY_MIN * 60000).toISOString(); ws.forEach((w) => { w.matchedPostId = post.id; }); }
             s.posts.unshift(post); return post;
           });

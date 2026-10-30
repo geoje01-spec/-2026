@@ -4,6 +4,7 @@ const SPECIES = {
   urchinroe: "성게알", urchin: "성게(통)", seaweed: "미역", hijiki: "톳", agar: "우뭇가사리",
   bomal: "보말(고둥류)", mussel: "홍합(섭)", oyster: "굴", seasquirt: "멍게", sealhare: "군소",
   barnacle: "거북손", gulfweed: "모자반", ecklonia: "감태",
+  other: "기타(위 목록에 없는 해산물)",
 };
 // 세부 품종과 구분하는 특징 (AI가 근거를 들어 고르게 함)
 const VARIETY_GUIDE = `
@@ -23,12 +24,13 @@ const VARIETY_GUIDE = `
 - 모자반: 참모자반(몸, 몸국 재료) / 괭생이모자반(떠밀려 온 것, 식용 아님)`;
 
 const PROMPT = `너는 제주 해녀가 잡은 해산물을 오래 다뤄 온 수산물 감별사다. 사진을 꼼꼼히 보고 아래 JSON 하나만 답하라.
+목록에 없는 해산물(예: 가리비, 키조개, 낙지, 오징어, 갈치, 고등어, 해파리)이면 억지로 비슷한 품목에 넣지 말고 species는 "other", variety에는 그 해산물의 정확한 한국어 이름을 쓴다.
 세부 품종은 껍데기 색·무늬·가시·호흡구멍 수·크기 같은 보이는 특징으로 구분하고, 근거를 basis에 쓴다. 특징이 안 보여 확실하지 않으면 variety는 "모름"으로 한다.
 ${VARIETY_GUIDE}
 
 {"isSeafood": 해산물이 보이면 true,
  "species": 가장 많이 보이는 것의 영어 키. 다음 중 하나 ${Object.entries(SPECIES).map(([k, v]) => `${k}(${v})`).join(", ")},
- "variety": 세부 품종 한국어 이름 (위 목록 중 하나, 목록에 없으면 보이는 대로, 모르면 "모름"),
+ "variety": 세부 품종 한국어 이름 (위 목록 중 하나, 목록에 없으면 보이는 대로, 모르면 "모름". species가 "other"이면 그 해산물 이름),
  "basis": 그 품목·품종으로 본 근거를 해녀가 알아듣게 한 문장 (예: "껍데기에 뿔 같은 가시가 줄지어 있어 뿔소라로 봤어요"),
  "others": 함께 보이는 다른 해산물 목록 [{"name": 한국어 이름(세부 품종까지), "count": 개수}] (없으면 []),
  "count": 주 품목의 보이는 개수(정수, 미역·톳처럼 셀 수 없으면 0),
