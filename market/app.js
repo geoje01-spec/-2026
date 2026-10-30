@@ -159,7 +159,7 @@
       ${p.promo ? `<p class="promo">${esc(p.promo)}</p>` : ''}
       <div class="row between" style="align-items:flex-end">
         ${p.askPerKg ? `<div class="price num" style="font-size:32px">${won(p.askPerKg).replace('원', '')}<small>원 / kg</small></div>` : '<strong>가격은 연락해서 물어보세요</strong>'}
-        <span class="muted small">참고 시세 kg당 ${won(p.refPerKg)}</span>
+        <span class="muted small">참고 시세 kg당 ${won(p.refPerKg)}${p.refLive ? ' (aT)' : ''}</span>
       </div>
       ${owner ? ownerBtns : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 연락해 보세요.</p>' + contact(p.author, sp.ko) : contact(p.author, sp.ko))}
     </article>`;
@@ -227,7 +227,7 @@
         ${d.askPerKg != null ? `
           <div class="price num">${won(d.askPerKg).replace('원', '')}<small>원 / kg</small></div>
           <div class="row"><button type="button" class="btn sm" data-act="d-adj" data-v="-1000">1,000원 내리기</button><button type="button" class="btn sm" data-act="d-adj" data-v="1000">1,000원 올리기</button></div>` : ''}
-        <p class="muted small" style="margin:0">참고 시세는 kg당 ${won(ref)}이에요 (기본 참고가, 예시 값). 값은 손님과 직접 정하셔도 돼요.</p>
+        <p class="muted small" style="margin:0">추천 값은 kg당 ${won(ref)}이에요. ${esc(A.marketNote(d.species))} 값은 손님과 직접 정하셔도 돼요.</p>
       </section>
       <section class="card">
         <div class="row between"><div class="eyebrow">홍보 글</div><button type="button" class="btn sm" data-act="rewrite" ${d.rewriting ? 'disabled' : ''}>${d.rewriting ? '쓰는 중…' : 'AI가 다시 쓰기'}</button></div>
@@ -365,7 +365,7 @@
     document.body.classList.toggle('haenyeo', ui.role === 'h');
     $('#role-h').setAttribute('aria-pressed', ui.role === 'h');
     $('#role-c').setAttribute('aria-pressed', ui.role === 'c');
-    $('#mode').innerHTML = `<span><i class="dot ${CONFIG.gemini ? 'on' : ''}"></i>사진 판별 ${CONFIG.gemini ? 'Gemini' : '데모'}</span><span><i class="dot ${CONFIG.shared ? 'on' : ''}"></i>${CONFIG.shared ? '모든 손님에게 공유' : '이 기기에만 저장'}</span>`;
+    $('#mode').innerHTML = `<span><i class="dot ${CONFIG.gemini ? 'on' : ''}"></i>사진 판별 ${CONFIG.gemini ? 'Gemini' : '데모'}</span><span><i class="dot ${CONFIG.priceN ? 'on' : ''}"></i>시세 ${CONFIG.priceN ? 'aT ' + CONFIG.priceN + '품목' : '기본 참고가'}</span><span><i class="dot ${CONFIG.shared ? 'on' : ''}"></i>${CONFIG.shared ? '모든 손님에게 공유' : '이 기기에만 저장'}</span>`;
     const tabs = TABS[ui.role];
     const cur = tabs.find((t) => t.id === ui.tab[ui.role]) || (HIDDEN[ui.role] || []).find((t) => t.id === ui.tab[ui.role]) || tabs[0];
     const ti = $('#tabs');
@@ -505,7 +505,7 @@
             const post = {
               id: A.uid('p'), ownerId: DEV, author: Object.assign({}, ui.me),
               species: d.species, grade: d.grade, freshness: d.freshness, weightKg: d.weightKg,
-              refPerKg: A.refPrice(d), askPerKg: d.askPerKg, photo: d.photo || null,
+              refPerKg: A.refPrice(d), refLive: A.basePerKg(d.species).live, askPerKg: d.askPerKg, photo: d.photo || null,
               promo: d.promo, createdAt: new Date().toISOString(), status: 'open'
             };
             const ws = s.wants.filter((w) => !w.matchedPostId && (w.species || []).includes(post.species));
@@ -591,5 +591,13 @@
     await load();
     norm(S);
     render();
+    // 오늘 수산물 시세(aT)를 받아서 추천 가격에 씀
+    if (CONFIG.price) {
+      try {
+        const r = await fetch('/api/price', { cache: 'no-store' });
+        const j = await r.json();
+        if (r.ok && j.rows) { CONFIG.priceN = A.setMarket(j.rows); CONFIG.priceDate = j.date; render(); }
+      } catch { /* 시세를 못 받으면 기본 참고가 */ }
+    }
   })();
 })();

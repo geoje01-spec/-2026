@@ -2,5 +2,5 @@
 module.exports = (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const shared = !!((process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL) && (process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN));
-  res.status(200).json({ gemini: !!process.env.GEMINI_KEY, shared });
+  res.status(200).json({ gemini: !!process.env.GEMINI_KEY, shared, price: !!process.env.DATA_GO_KEY });
 };

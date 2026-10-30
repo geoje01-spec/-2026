@@ -30,10 +30,50 @@
   const iso = (d) => new Date(d).toISOString();
   const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1); return (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28) ? a : b; };
 
+  // aT 「최근일자 도·소매가격」에서 받은 실제 시세 (품목별 도매·소매 kg당 가격)
+  const MARKET = {};
+  const PRICE_NAMES = {
+    abalone: ['전복'], obunjagi: ['오분자기'], turban: ['소라'], octopus: ['문어'], seacucumber: ['해삼'],
+    urchinroe: ['성게'], urchin: ['성게'], seaweed: ['미역'], hijiki: ['톳'], agar: ['우뭇가사리', '우무']
+  };
+  const SKIP = /(건|마른|젓|액젓|냉동|수입|염장|조미|가공)/;   // 말린 것·가공품은 생물 가격과 달라서 뺌
+  const median = (a) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
+  function setMarket(rows) {
+    Object.keys(MARKET).forEach((k) => delete MARKET[k]);
+    for (const [k, names] of Object.entries(PRICE_NAMES)) {
+      const cand = (rows || []).filter((r) => {
+        const t = (r.item || '') + ' ' + (r.kind || '');
+        return r.perKg && names.some((n) => t.includes(n)) && !SKIP.test(t);
+      });
+      if (!cand.length) continue;
+      const ws = cand.filter((r) => /도매/.test(r.se || '') || String(r.seCd) === '02');
+      const rt = cand.filter((r) => /소매/.test(r.se || '') || String(r.seCd) === '01');
+      MARKET[k] = { wholesale: median(ws.map((r) => r.perKg)), retail: median(rt.map((r) => r.perKg)), any: median(cand.map((r) => r.perKg)), date: cand[0].date || null };
+    }
+    return Object.keys(MARKET).length;
+  }
+  // 직거래 기준가: 도매가 있으면 도매 × 1.15(해녀 몫), 소매만 있으면 소매 × 0.9(손님도 이득), 없으면 예시 참고가
+  function basePerKg(species) {
+    const m = MARKET[species], sp = SPECIES[species];
+    if (m && m.wholesale) return { v: m.wholesale * 1.15, live: true };
+    if (m && m.retail) return { v: m.retail * 0.9, live: true };
+    if (m && m.any) return { v: m.any, live: true };
+    return { v: sp ? sp.refPerKg : 0, live: false };
+  }
+  function marketNote(species) {
+    const m = MARKET[species];
+    const won = (n) => Math.round(n / 100) * 100;
+    if (!m) return '기본 참고가(예시 값)예요. 오늘 aT 시세에 이 품목이 없어요.';
+    const d = m.date ? String(m.date).replace(/^(\d{4})-?(\d\d)-?(\d\d).*/, '$2/$3') + ' ' : '';
+    const parts = [];
+    if (m.wholesale) parts.push('도매 kg당 ' + won(m.wholesale).toLocaleString('ko-KR') + '원');
+    if (m.retail) parts.push('소매 kg당 ' + won(m.retail).toLocaleString('ko-KR') + '원');
+    if (!parts.length) parts.push('kg당 ' + won(m.any).toLocaleString('ko-KR') + '원');
+    return 'aT ' + d + '시세: ' + parts.join(', ') + (m.wholesale ? '. 도매가보다 15% 높게 잡아 해녀님 몫을 늘렸어요.' : '.');
+  }
   function refPrice({ species, grade, freshness }) {
-    const sp = SPECIES[species];
-    if (!sp) return 0;
-    return round100(sp.refPerKg * (GRADES[grade] || 1) * (FRESH[freshness] || 1));
+    if (!SPECIES[species]) return 0;
+    return round100(basePerKg(species).v * (GRADES[grade] || 1) * (FRESH[freshness] || 1));
   }
 
   // AI가 없을 때 쓰는 홍보 글 틀
@@ -96,7 +136,7 @@
     };
   }
 
-  const api = { detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed };
+  const api = { detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);
