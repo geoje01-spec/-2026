@@ -80,6 +80,12 @@
     rv: Object.assign({ name: '', phone: '', text: '' }, store.get('hb2-guest', null) || {})
   };
 
+  // 지역: 해녀는 내 정보의 지역, 손님은 고른 지역(또는 내 위치)
+  const myRegion = () => ui.me.region || A.regionOf(ui.me.village) || 'jeju';
+  const rp = (d) => Object.assign({ region: myRegion() }, d);
+  ui.region = store.get('hb2-region', null) || 'jeju';
+  const regionName = (k) => (A.REGIONS[k] || {}).name || '';
+
   function toast(msg) {
     const t = document.createElement('div');
     t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = msg;
@@ -155,7 +161,7 @@
       ${owner && isEarly(p) ? `<div class="notice">예약 손님에게 먼저 보여주는 중 · ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개</div>` : ''}
       ${p.photo ? `<img class="photo" src="${esc(p.photo)}" alt="${esc(sp.ko)} 사진">` : ''}
       <div class="row between"><h2>${esc(A.label(p.species, p.variety))} <span class="muted small">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
-      <div class="kv"><span>${esc(ago(p.createdAt))} 올림</span><span>양 <b>${kg(p.weightKg)}</b></span>${p.example ? '<span class="pill info">예시 글</span>' : ''}</div>
+      <div class="kv">${(p.author && (p.author.region || A.regionOf(p.author.village))) ? `<span>${esc(regionName(p.author.region || A.regionOf(p.author.village)))}${A.isSpecial(p.author.region || A.regionOf(p.author.village), p.species) ? ' 특산' : ''}</span>` : ''}<span>${esc(ago(p.createdAt))} 올림</span><span>양 <b>${kg(p.weightKg)}</b></span>${p.example ? '<span class="pill info">예시 글</span>' : ''}</div>
       ${p.promo ? `<p class="promo">${esc(p.promo)}</p>` : ''}
       <div class="row between" style="align-items:flex-end">
         ${p.askPerKg ? `<div class="price num" style="font-size:32px">${won(p.askPerKg).replace('원', '')}<small>원 / kg</small></div>` : '<strong>가격은 연락해서 물어보세요</strong>'}
@@ -204,7 +210,7 @@
     html += d.photo ? `<img class="photo" src="${esc(d.photo)}" alt="방금 찍은 해산물 사진">` : '';
     if (d.status === 'analyzing') return html + `<div class="card"><div class="loading"><span class="spin" aria-hidden="true"></span>AI가 품목을 보고 홍보 글을 쓰고 있어요</div></div>`;
     if (d.status === 'error') return html + `<div class="card"><div class="banner">${esc(d.error)}</div><button type="button" class="btn big" data-act="retake">다시 찍기</button></div>`;
-    const ref = A.refPrice(d);
+    const ref = A.refPrice(rp(d));
     html += `
       <section class="card">
         <div class="row between"><div class="eyebrow">AI가 본 결과</div>${d.ai.demo ? '<span class="pill info">데모</span>' : `<span class="pill ${d.ai.confidence >= .7 ? 'ok' : 'warn'}">확신 ${Math.round((d.ai.confidence || 0) * 100)}%</span>`}</div>
@@ -212,7 +218,8 @@
         ${d.ai.basis ? `<p class="muted small" style="margin:0">구분 근거: ${esc(d.ai.basis)}</p>` : ''}
         ${Array.isArray(d.ai.others) && d.ai.others.length ? `<p class="muted small" style="margin:0">함께 보여요: ${esc(d.ai.others.map((o) => (o.name || '') + (o.count ? ' ' + o.count + '개' : '')).join(', '))}. 따로 올리려면 다시 찍어 주세요.</p>` : ''}
         <h3>품목</h3>
-        <div class="chips">${Object.entries(SP).map(([k, v]) => `<button type="button" class="chip" data-act="d-species" data-v="${k}" aria-pressed="${k === d.species}">${k === 'other' ? '기타 (직접 입력)' : esc(v.ko)}</button>`).join('')}</div>
+        <div class="chips">${Object.entries(SP).sort(([a], [b]) => A.isSpecial(myRegion(), b) - A.isSpecial(myRegion(), a)).map(([k, v]) => `<button type="button" class="chip" data-act="d-species" data-v="${k}" aria-pressed="${k === d.species}">${k === 'other' ? '기타 (직접 입력)' : (A.isSpecial(myRegion(), k) ? '★ ' : '') + esc(v.ko)}</button>`).join('')}</div>
+        <p class="muted small" style="margin:0">★ = ${esc(regionName(myRegion()))} 특산품. 손님 화면에서 추천으로 먼저 보여요.</p>
         ${d.species === 'other' ? `<label class="field" for="other-name">해산물 이름 ${d.ai.variety && d.ai.species === 'other' ? '<span class="muted small" style="font-weight:400">AI가 본 이름, 맞는지 봐 주세요</span>' : ''}<input type="text" id="other-name" value="${esc(d.variety || '')}" placeholder="예: 가리비, 낙지, 오징어"></label>` : ''}
         ${(() => { const list = (A.VARIETIES[d.species] || []).slice(); if (d.variety && !list.includes(d.variety)) list.unshift(d.variety); return list.length ? `<h3>세부 품종 <span class="muted small" style="font-weight:400">${d.ai.variety ? 'AI가 고른 값, 맞는지 봐 주세요' : '아는 경우만 골라 주세요'}</span></h3>
         <div class="chips">${list.map((v) => `<button type="button" class="chip" data-act="d-variety" data-v="${esc(v)}" aria-pressed="${v === d.variety}">${esc(v)}</button>`).join('')}<button type="button" class="chip" data-act="d-variety" data-v="" aria-pressed="${!d.variety}">모름</button></div>` : ''; })()}
@@ -232,7 +239,7 @@
         ${d.askPerKg != null ? `
           <div class="price num">${won(d.askPerKg).replace('원', '')}<small>원 / kg</small></div>
           <div class="row"><button type="button" class="btn sm" data-act="d-adj" data-v="-1000">1,000원 내리기</button><button type="button" class="btn sm" data-act="d-adj" data-v="1000">1,000원 올리기</button></div>` : ''}
-        <p class="muted small" style="margin:0">${ref ? `추천 값은 kg당 ${won(ref)}이에요. ${esc(A.marketNote(d.species, d.variety))} 값은 손님과 직접 정하셔도 돼요.` : esc(A.marketNote(d.species, d.variety))}</p>
+        <p class="muted small" style="margin:0">${ref ? `추천 값은 kg당 ${won(ref)}이에요. ${esc(A.marketNote(d.species, d.variety))}${esc(A.regionNote(myRegion()))} 값은 손님과 직접 정하셔도 돼요.` : esc(A.marketNote(d.species, d.variety))}</p>
       </section>
       <section class="card">
         <div class="row between"><div class="eyebrow">홍보 글</div><button type="button" class="btn sm" data-act="rewrite" ${d.rewriting ? 'disabled' : ''}>${d.rewriting ? '쓰는 중…' : 'AI가 다시 쓰기'}</button></div>
@@ -287,6 +294,7 @@
       <section class="card">
         <label class="field">이름<input type="text" id="me-name" value="${esc(m.name)}" autocomplete="name"></label>
         <label class="field">어촌계<input type="text" id="me-village" value="${esc(m.village)}"></label>
+        <label class="field">지역 <span class="muted small" style="font-weight:400">특산품 추천과 지역 물가에 써요</span><select id="me-region">${Object.entries(A.REGIONS).map(([k, r]) => `<option value="${k}"${k === myRegion() ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
         <label class="field">전화번호<input type="text" id="me-phone" value="${esc(m.phone)}" inputmode="tel" autocomplete="tel"></label>
         <label class="field">손님과 만나는 곳<input type="text" id="me-place" value="${esc(m.place)}"></label>
         <label class="field">판매 시간<input type="text" id="me-hours" value="${esc(m.hours)}"></label>
@@ -297,15 +305,25 @@
   /* ---------- 손님: 해산물 ---------- */
   function cMarket() {
     const kinds = [...new Set(S.posts.map((p) => p.species))];
-    const rank = (p) => (isEarly(p) && canSeeEarly(p) ? 0 : p.status === 'sold' ? 2 : 1);
+    const R = ui.region, here = (p) => (p.author.region || A.regionOf(p.author.village)) === R;
+    // 순서: 먼저 보기 → 우리 지역 특산품 → 우리 지역 → 다른 지역 → 다 팔린 것
+    const rank = (p) => (isEarly(p) && canSeeEarly(p) ? 0 : p.status === 'sold' ? 9 : here(p) ? (A.isSpecial(R, p.species) ? 1 : 2) : 3);
     const list = S.posts.filter((p) => ui.filter === 'all' || p.species === ui.filter)
       .sort((a, b) => rank(a) - rank(b) || new Date(b.createdAt) - new Date(a.createdAt));
+    const specials = (A.REGIONS[R] || { specials: [] }).specials.map(([k, v]) => {
+      const n = S.posts.filter((p) => p.species === k && p.status !== 'sold' && here(p)).length;
+      return n
+        ? `<button type="button" class="sp-chip on" data-act="filter" data-v="${k}"><b>${esc(A.label(k, v))}</b><span>${n}건 있어요</span></button>`
+        : `<button type="button" class="sp-chip" data-act="sp-resv" data-v="${esc(A.label(k, v))}"><b>${esc(A.label(k, v))}</b><span>📅 예약</span></button>`;
+    }).join('');
     const arrived = myWants().filter((w) => w.matchedPostId).length;
     return `<div class="row between" style="align-items:flex-start;flex-wrap:nowrap">
-        <div class="stack"><div class="eyebrow">제주 해녀가 직접 알려요</div><h1>오늘 바다에서<br>올라온 해산물</h1></div>
+        <div class="stack"><div class="eyebrow">${esc(regionName(R))} 해녀가 직접 알려요</div><h1>오늘 바다에서<br>올라온 해산물</h1></div>
         <button type="button" class="cal-btn" data-act="open-resv" aria-label="먼저 보기 예약${myWants().length ? ', 예약 ' + myWants().length + '개' : ''}" title="먼저 보기 예약"><span aria-hidden="true">📅</span>${arrived ? `<span class="badge num">${arrived}</span>` : myWants().length ? '<i class="cal-dot"></i>' : ''}</button>
       </div>
       <div class="notice">해녀바당은 알리기만 도와요. 사고파는 건 해녀에게 전화나 문자로 직접 하세요. 수수료가 없어요.</div>
+      <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
+      <section class="card special"><div class="eyebrow">★ ${esc(regionName(R))} 특산품 추천</div><div class="sp-grid">${specials}</div><p class="muted small" style="margin:0">있는 건 눌러서 보고, 없는 건 예약해 두면 올라올 때 먼저 보여 드려요.</p></section>
       <div class="chips"><button type="button" class="chip" data-act="filter" data-v="all" aria-pressed="${ui.filter === 'all'}">전체</button>${kinds.map((k) => `<button type="button" class="chip" data-act="filter" data-v="${k}" aria-pressed="${ui.filter === k}">${esc(SP[k].ko)}</button>`).join('')}</div>
       ${list.length ? list.map((p) => (isEarly(p) && !canSeeEarly(p) ? teaser(p) : postCard(p, false))).join('') : '<div class="empty">아직 올라온 해산물이 없어요. 물질 끝나는 오후에 다시 봐 주세요.</div>'}`;
   }
@@ -370,7 +388,7 @@
     document.body.classList.toggle('haenyeo', ui.role === 'h');
     $('#role-h').setAttribute('aria-pressed', ui.role === 'h');
     $('#role-c').setAttribute('aria-pressed', ui.role === 'c');
-    $('#mode').innerHTML = `<span><i class="dot ${CONFIG.gemini ? 'on' : ''}"></i>사진 판별 ${CONFIG.gemini ? 'Gemini' : '데모'}</span><span><i class="dot ${CONFIG.priceN ? 'on' : ''}"></i>시세 ${CONFIG.priceN ? 'aT ' + CONFIG.priceN + '품목' : '기본 참고가'}</span><span><i class="dot ${CONFIG.shared ? 'on' : ''}"></i>${CONFIG.shared ? '모든 손님에게 공유' : '이 기기에만 저장'}</span>`;
+    $('#mode').innerHTML = `<span><i class="dot ${CONFIG.gemini ? 'on' : ''}"></i>사진 판별 ${CONFIG.gemini ? 'Gemini' : '데모'}</span><span><i class="dot ${CONFIG.priceN ? 'on' : ''}"></i>시세 ${CONFIG.priceN ? 'aT ' + CONFIG.priceN + '품목' : '기본 참고가'}</span>${CONFIG.regionN ? `<span><i class="dot on"></i>지역 물가 ${CONFIG.regionN}곳</span>` : ''}<span><i class="dot ${CONFIG.shared ? 'on' : ''}"></i>${CONFIG.shared ? '모든 손님에게 공유' : '이 기기에만 저장'}</span>`;
     const tabs = TABS[ui.role];
     const cur = tabs.find((t) => t.id === ui.tab[ui.role]) || (HIDDEN[ui.role] || []).find((t) => t.id === ui.tab[ui.role]) || tabs[0];
     const ti = $('#tabs');
@@ -431,7 +449,7 @@
         status: 'ready', ai, species: ai.species, variety: (typeof ai.variety === 'string' && ai.variety.trim() && !/모름|없음|unknown/i.test(ai.variety)) ? ai.variety.trim().slice(0, 20) : null, grade: ai.grade, freshness: ai.freshness,
         weightKg: Math.max(0.5, Math.round((ai.estWeightKg || 1) * 2) / 2)
       });
-      d.askPerKg = A.refPrice(d) || null;
+      d.askPerKg = A.refPrice(rp(d)) || null;
       d.promo = ai.promo || A.promo(Object.assign({ author: ui.me }, d));
     } catch (e) { d.status = 'error'; d.error = e.message; }
     render();
@@ -484,7 +502,7 @@
   /* ---------- 동작 ---------- */
   document.addEventListener('change', (e) => {
     if (e.target.id === 'cam' && e.target.files[0]) onPhoto(e.target.files[0]);
-    if (e.target.id === 'other-name') { const d = ui.draft; d.variety = e.target.value.trim() || null; if (d.askPerKg != null) d.askPerKg = A.refPrice(d) || d.askPerKg; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); }
+    if (e.target.id === 'other-name') { const d = ui.draft; d.variety = e.target.value.trim() || null; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)) || d.askPerKg; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); }
   });
   document.addEventListener('input', (e) => {
     if (e.target.id === 'promo') ui.draft.promo = e.target.value;
@@ -502,11 +520,11 @@
       case 'dismiss-post': ui.lastPost = null; render(); break;
       case 'retake': ui.draft = { status: 'idle' }; render(); break;
       case 'd-variety': d.variety = v || null; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
-      case 'd-species': d.variety = null; d.species = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
-      case 'd-grade': d.grade = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); render(); break;
-      case 'd-fresh': d.freshness = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(d); render(); break;
+      case 'd-species': d.variety = null; d.species = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)); d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
+      case 'd-grade': d.grade = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)); render(); break;
+      case 'd-fresh': d.freshness = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)); render(); break;
       case 'd-w': d.weightKg = Math.max(0.5, Math.round((d.weightKg + +v) * 10) / 10); render(); break;
-      case 'd-ask': d.askPerKg = v === 'on' ? (A.refPrice(d) || 10000) : null; render(); break;
+      case 'd-ask': d.askPerKg = v === 'on' ? (A.refPrice(rp(d)) || 10000) : null; render(); break;
       case 'd-adj': d.askPerKg = Math.max(1000, d.askPerKg + +v); render(); break;
       case 'rewrite': run(rewrite); break;
       case 'publish': {
@@ -519,7 +537,7 @@
             const post = {
               id: A.uid('p'), ownerId: DEV, author: Object.assign({}, ui.me),
               species: d.species, variety: d.variety || null, grade: d.grade, freshness: d.freshness, weightKg: d.weightKg,
-              refPerKg: A.refPrice(d), refLive: A.basePerKg(d.species, d.variety).live, askPerKg: d.askPerKg, photo: d.photo || null,
+              refPerKg: A.refPrice(rp(d)), refLive: A.basePerKg(d.species, d.variety).live, askPerKg: d.askPerKg, photo: d.photo || null,
               promo: d.promo, createdAt: new Date().toISOString(), status: 'open'
             };
             const ws = s.wants.filter((w) => !w.matchedPostId && ((w.species || []).includes(post.species) || (post.species === 'other' && post.variety && String(w.text || '').includes(post.variety))));
@@ -537,12 +555,20 @@
       case 'del': ui.delArm = null; run(() => mutate((s) => { s.posts = s.posts.filter((x) => x.id !== b.dataset.id); })).then(() => toast('글을 내렸어요.')); break;
       case 'reset': run(async () => { S = A.seed(); store.set('hb2-state', S); if (CONFIG.shared) await pushShared(); ui.lastPost = null; render(); toast('예시 글로 되돌렸어요.'); }); break;
       case 'me-save': {
-        const m = { name: $('#me-name').value.trim(), village: $('#me-village').value.trim(), phone: $('#me-phone').value.trim(), place: $('#me-place').value.trim(), hours: $('#me-hours').value.trim() };
+        const m = { name: $('#me-name').value.trim(), village: $('#me-village').value.trim(), region: $('#me-region').value, phone: $('#me-phone').value.trim(), place: $('#me-place').value.trim(), hours: $('#me-hours').value.trim() };
         if (!m.name || !digits(m.phone)) { toast('이름과 전화번호는 꼭 적어 주세요.'); break; }
         ui.me = m; store.set('hb2-me', m); toast('저장했어요. 다음에 올리는 글부터 이 정보가 보여요.');
         ui.tab.h = ui.draft.status === 'ready' ? 'upload' : 'me'; render();
         break;
       }
+      case 'region': ui.region = v; ui.filter = 'all'; store.set('hb2-region', v); render(); break;
+      case 'geo':
+        if (!navigator.geolocation) { toast('이 기기는 위치를 알 수 없어요. 지역을 직접 골라 주세요.'); break; }
+        toast('위치를 확인하고 있어요');
+        navigator.geolocation.getCurrentPosition((pos) => { ui.region = A.nearestRegion(pos.coords.latitude, pos.coords.longitude); store.set('hb2-region', ui.region); ui.filter = 'all'; render(); toast(regionName(ui.region) + ' 특산품을 보여 드릴게요.'); },
+          () => toast('위치를 못 가져왔어요. 지역을 직접 골라 주세요.'), { timeout: 8000 });
+        break;
+      case 'sp-resv': ui.rv.text = v + ' '; ui.tab.c = 'reserve'; render(); window.scrollTo(0, 0); break;
       case 'open-resv': ui.tab.c = 'reserve'; render(); window.scrollTo(0, 0); break;
       case 'close-resv': ui.tab.c = 'market'; render(); window.scrollTo(0, 0); break;
       case 'rv-chip': {
@@ -605,6 +631,10 @@
     await load();
     norm(S);
     render();
+    // 지역 물가 계수 (aT 지역별 가격)
+    if (CONFIG.price) {
+      fetch('/api/region', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((j) => { if (j) { CONFIG.regionN = A.setRegionIndex(j); render(); } }).catch(() => {});
+    }
     // 오늘 수산물 시세(aT)를 받아서 추천 가격에 씀
     if (CONFIG.price) {
       try {

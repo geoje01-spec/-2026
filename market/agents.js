@@ -99,6 +99,13 @@
     if (m && m.any) return { v: m.any, live: true };
     return { v: sp ? sp.refPerKg : 0, live: false };
   }
+  function regionNote(region) {
+    const f = REGION_INDEX[region];
+    if (!region || !REGIONS[region]) return '';
+    if (!f) return ` ${REGIONS[region].name} 지역 물가 자료가 없어 전국 기준으로 잡았어요.`;
+    const pct = Math.round((f - 1) * 100);
+    return ` ${REGIONS[region].name} 수산물 값이 전국 평균보다 ${pct === 0 ? '비슷해서 그대로' : Math.abs(pct) + '% ' + (pct > 0 ? '높아서 그만큼 올렸어요' : '낮아서 그만큼 내렸어요')}${pct === 0 ? ' 뒀어요' : ''}.`;
+  }
   function marketNote(species, variety) {
     const m = marketFor(species, variety);
     const won = (n) => Math.round(n / 100) * 100;
@@ -111,9 +118,9 @@
     if (!parts.length) parts.push('kg당 ' + won(m.any).toLocaleString('ko-KR') + '원');
     return 'aT ' + d + '시세: ' + parts.join(', ') + (m.wholesale ? '. 도매가보다 15% 높게 잡아 해녀님 몫을 늘렸어요.' : '.');
   }
-  function refPrice({ species, variety, grade, freshness }) {
+  function refPrice({ species, variety, grade, freshness, region }) {
     if (!SPECIES[species]) return 0;
-    return round100(basePerKg(species, variety).v * (GRADES[grade] || 1) * (FRESH[freshness] || 1));
+    return round100(basePerKg(species, variety).v * (GRADES[grade] || 1) * (FRESH[freshness] || 1) * regionFactor(region));
   }
 
   // AI가 없을 때 쓰는 홍보 글 틀
@@ -174,13 +181,48 @@
     return hit;
   }
 
-  const EXAMPLE_ME = { name: '김순덕(예시)', village: '하도 어촌계', phone: '010-0000-0000', place: '하도 어촌계 해녀 판매장', hours: '물질 끝나고 오후 3~5시' };
+  /* ---------- 지역: 특산품 추천과 지역 물가 ---------- */
+  // 해녀가 물질하는 주요 지역과 널리 알려진 특산 해산물 (일반 정보)
+  const REGIONS = {
+    jeju:      { name: '제주', at: [33.38, 126.55], keys: ['제주', '서귀포'], specials: [['turban', '뿔소라'], ['obunjagi', null], ['urchinroe', '보라성게알'], ['hijiki', null], ['agar', null], ['gulfweed', '참모자반(몸)'], ['bomal', null]] },
+    busan:     { name: '부산', at: [35.18, 129.08], keys: ['부산', '기장', '영도'], specials: [['seaweed', '돌미역(자연산)'], ['seasquirt', null], ['seacucumber', null], ['urchin', null]] },
+    ulsan:     { name: '울산', at: [35.54, 129.31], keys: ['울산', '강동', '정자'], specials: [['seaweed', '돌미역(자연산)'], ['abalone', null], ['urchinroe', null]] },
+    gyeongbuk: { name: '경북', at: [36.2, 129.37], keys: ['포항', '구룡포', '영덕', '울진', '경주', '경북', '안동'], specials: [['seaweed', '돌미역(자연산)'], ['octopus', '돌문어(참문어)'], ['urchinroe', null], ['seacucumber', null]] },
+    gangwon:   { name: '강원', at: [37.75, 128.9], keys: ['강릉', '삼척', '고성', '양양', '속초', '동해', '강원', '춘천'], specials: [['mussel', '참홍합(섭)'], ['urchinroe', null], ['octopus', '대문어(피문어)'], ['abalone', null]] },
+    gyeongnam: { name: '경남', at: [34.88, 128.62], keys: ['거제', '통영', '남해', '창원', '경남', '진주'], specials: [['seasquirt', null], ['oyster', null], ['seacucumber', null], ['mussel', null]] },
+    jeonnam:   { name: '전남', at: [34.6, 126.9], keys: ['완도', '여수', '진도', '목포', '순천', '전남', '광주'], specials: [['abalone', null], ['hijiki', null], ['seaweed', null], ['oyster', null]] },
+    chungnam:  { name: '충남', at: [36.6, 126.3], keys: ['태안', '보령', '서산', '천안', '충남', '대전'], specials: [['oyster', null], ['seacucumber', null]] }
+  };
+  function regionOf(text) {
+    const t = String(text || '');
+    if (REGIONS[t]) return t;
+    return Object.keys(REGIONS).find((k) => REGIONS[k].keys.some((w) => t.includes(w)) || t.includes(REGIONS[k].name)) || null;
+  }
+  // 위도·경도에서 가장 가까운 지역
+  function nearestRegion(lat, lon) {
+    let best = null, bd = Infinity;
+    for (const [k, r] of Object.entries(REGIONS)) { const d = (r.at[0] - lat) ** 2 + ((r.at[1] - lon) * Math.cos(lat * Math.PI / 180)) ** 2; if (d < bd) { bd = d; best = k; } }
+    return best;
+  }
+  const isSpecial = (region, species) => !!(REGIONS[region] && REGIONS[region].specials.some(([k]) => k === species));
+  // 지역 물가 계수: aT 지역별 수산물 소매가 ÷ 전국 평균 (서버 /api/region 이 계산). 자료가 없으면 1
+  const REGION_INDEX = {};
+  let REGION_META = null;
+  function setRegionIndex(data) {
+    Object.keys(REGION_INDEX).forEach((k) => delete REGION_INDEX[k]);
+    Object.entries((data && data.factors) || {}).forEach(([k, v]) => { if (REGIONS[k] && v > 0.5 && v < 2) REGION_INDEX[k] = v; });
+    REGION_META = data || null;
+    return Object.keys(REGION_INDEX).length;
+  }
+  const regionFactor = (region) => REGION_INDEX[region] || 1;
+
+  const EXAMPLE_ME = { name: '김순덕(예시)', village: '하도 어촌계', region: 'jeju', phone: '010-0000-0000', place: '하도 어촌계 해녀 판매장', hours: '물질 끝나고 오후 3~5시' };
 
   function seed() {
     const now = Date.now();
     const h = (n) => iso(now - n * 3600 * 1000);
     const a1 = Object.assign({}, EXAMPLE_ME);
-    const a2 = { name: '고옥자(예시)', village: '종달 어촌계', phone: '010-0000-0001', place: '종달리 포구 앞', hours: '오전 11시~오후 2시' };
+    const a2 = { name: '고옥자(예시)', village: '종달 어촌계', region: 'jeju', phone: '010-0000-0001', place: '종달리 포구 앞', hours: '오전 11시~오후 2시' };
     const mk = (author, species, grade, freshness, weightKg, ask, hrs, status) => ({
       id: uid('p'), ownerId: 'seed', example: true, author, species, grade, freshness, weightKg,
       refPerKg: refPrice({ species, grade, freshness }), askPerKg: ask, photo: null,
@@ -205,7 +247,7 @@
     };
   }
 
-  const api = { label, VARIETIES, detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET };
+  const api = { REGIONS, regionOf, nearestRegion, isSpecial, setRegionIndex, regionFactor, regionNote, label, VARIETIES, detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);
