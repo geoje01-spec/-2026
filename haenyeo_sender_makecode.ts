@@ -17,6 +17,7 @@ radio.setTransmitPower(7)
 let sos = 0          // 1이면 해녀가 직접 SOS 요청
 let fall = 0         // 1이면 자유낙하 또는 강한 충격 감지
 let asking = false   // true면 관제(AI 에이전트)가 "괜찮으세요?" 확인 중
+let recallUntil = 0  // 이 시각까지 "쉬러 나오세요" 알림
 let lastMove = input.runningTime()
 let bpm = -1         // 맥박 센서가 없으면 -1
 let lastBeat = 0
@@ -30,10 +31,27 @@ input.onGesture(Gesture.SixG, function () {
     fall = 1
 })
 
-// 관제에서 확인 신호가 오면 소리·불빛으로 알림. 형식: Q,번호
+// 관제(AI 에이전트)에서 오는 신호
+//  Q,번호 : 괜찮으세요? → 소리·놀란 얼굴, A나 B 버튼으로 응답
+//  R,번호 / R,0 : 쉬러 나오세요 → 위쪽 화살표와 낮은 소리 10초
 radio.onReceivedString(function (s) {
     if (s == "Q," + DIVER_ID) {
         asking = true
+    } else if (s == "R," + DIVER_ID || s == "R,0") {
+        recallUntil = input.runningTime() + 10000
+    }
+})
+control.inBackground(function () {
+    while (true) {
+        if (!asking && input.runningTime() < recallUntil) {
+            basic.showArrow(ArrowNames.North)
+            music.playTone(Note.G4, music.beat(BeatFraction.Half))
+            basic.pause(300)
+            basic.clearScreen()
+            basic.pause(300)
+        } else {
+            basic.pause(200)
+        }
     }
 })
 control.inBackground(function () {
@@ -121,7 +139,7 @@ basic.forever(function () {
     if (still > 999) still = 999
     const msg = DIVER_ID + "," + input.temperature() + "," + bpm + "," + fall + "," + still + "," + sos
     radio.sendString(msg)
-    if (sos == 0 && fall == 0 && !asking) {
+    if (sos == 0 && fall == 0 && !asking && input.runningTime() >= recallUntil) {
         led.toggle(2, 2)   // 가운데 불빛이 깜빡이면 정상 전송 중
     }
     basic.pause(1000)
