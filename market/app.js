@@ -419,7 +419,7 @@
     const d = ui.draft = { status: 'analyzing', variant: 0 };
     ui.lastPost = null;
     try {
-      const [big, small] = await Promise.all([shrink(file, 1024, 0.82), shrink(file, 480, 0.65)]);
+      const [big, small] = await Promise.all([shrink(file, 896, 0.8), shrink(file, 480, 0.65)]);   // 판별용은 조금 작게 해서 빠르게
       d.photo = small;
       render();
       const ai = await analyze(big);

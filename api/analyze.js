@@ -41,24 +41,34 @@ ${VARIETY_GUIDE}
  "notes": 해녀 어르신이 읽을 쉬운 한국어 한두 문장 (확인할 점, 깨진 껍데기·상처가 있으면 그것도),
  "promo": 손님에게 알리는 홍보 글. 제주 해녀 어르신의 따뜻한 말투로 2~3문장, 세부 품종 이름과 싱싱함을 살려서. 가격·전화번호·이모지·해시태그는 넣지 말 것}`;
 
-// 모델 하나를 시간 제한을 두고 부름 (생각 단계를 줄여 빠르게, 거부되면 그 설정 없이 다시)
-async function call(model, key, body, ms, think = true) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), ms);
-  try {
-    const generationConfig = { temperature: 0.2, responseMimeType: "application/json" };
-    if (think) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST", signal: ctl.signal,
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ inlineData: { mimeType: body.mime || "image/jpeg", data: body.image } }, { text: PROMPT }] }], generationConfig }),
-    });
-    const json = await r.json().catch(() => ({}));
-    if (r.status === 400 && think && /think/i.test(json.error?.message || "")) return call(model, key, body, ms, false);
-    return { status: r.status, json, model };
-  } catch (e) {
-    return { status: 504, json: { error: { message: e.name === "AbortError" ? `${model} 응답이 ${ms / 1000}초 넘게 걸림` : e.message } }, model };
-  } finally { clearTimeout(timer); }
+// 모델 하나를 시간 제한을 두고 부름. 생각 단계 설정은 모델마다 받는 형식이 달라서,
+// 거부(400)되면 다음 형식으로, 마지막엔 설정 없이 다시 보냄
+const THINK = [{ thinkingLevel: "low" }, { thinkingBudget: 0 }, null];
+async function call(model, key, body, ms) {
+  const until = Date.now() + ms;
+  let last = null;
+  for (const t of THINK) {
+    const left = until - Date.now();
+    if (left < 1500) break;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), left);
+    try {
+      const generationConfig = { temperature: 0.2, responseMimeType: "application/json" };
+      if (t) generationConfig.thinkingConfig = t;
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST", signal: ctl.signal,
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify({ contents: [{ role: "user", parts: [{ inlineData: { mimeType: body.mime || "image/jpeg", data: body.image } }, { text: PROMPT }] }], generationConfig }),
+      });
+      const json = await r.json().catch(() => ({}));
+      last = { status: r.status, json, model };
+      if (r.status === 400 && t) continue;   // 이 생각 설정을 안 받음 → 다음 형식
+      return last;
+    } catch (e) {
+      return { status: 504, json: { error: { message: e.name === "AbortError" ? `${model} 응답이 ${Math.round(ms / 1000)}초 넘게 걸림` : e.message } }, model };
+    } finally { clearTimeout(timer); }
+  }
+  return last || { status: 504, json: { error: { message: `${model} 시간 부족` } }, model };
 }
 
 module.exports = async (req, res) => {
@@ -70,8 +80,8 @@ module.exports = async (req, res) => {
   try {
     // 세부 품종 구분은 정확도가 중요해서 Flash를 먼저, 안 되면(사용량 초과 등) 가벼운 Flash-Lite
     const tried = [];
-    let out = await call("gemini-flash-latest", key, body, 25000);
-    if (out.status !== 200) { tried.push(out.json.error?.message || out.status); out = await call("gemini-flash-lite-latest", key, body, 20000); }
+    let out = await call("gemini-flash-latest", key, body, 30000);
+    if (out.status !== 200) { tried.push(out.json.error?.message || out.status); out = await call("gemini-flash-lite-latest", key, body, 22000); }
     if (out.status !== 200) { tried.push(out.json.error?.message || out.status); return res.status(502).json({ error: "Gemini 오류: " + tried.join(" / ") }); }
     const text = (out.json.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
     const ai = JSON.parse(text.replace(/^```(json)?|```$/g, "").trim());
