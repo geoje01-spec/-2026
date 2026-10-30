@@ -13,6 +13,7 @@
     const h = Math.round(m / 60);
     return h < 24 ? h + '시간 전' : Math.round(h / 24) + '일 전';
   };
+  const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1); return (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28) ? a : b; };
   const digits = (p) => String(p || '').replace(/[^\d+]/g, '');
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
@@ -45,9 +46,14 @@
     }
     S = store.get('hb2-state', null) || A.seed();
   }
+  function norm(s) {
+    s.wants = (s.wants || []).filter((w) => Date.now() - new Date(w.createdAt) < A.WANT_DAYS * 864e5);
+    return s;
+  }
   // 바꾸기 전에 최신 게시판을 받아와서 다른 해녀가 올린 글을 덮어쓰지 않게 함
   async function mutate(fn) {
     if (CONFIG.shared) { const d = await fetchShared(); if (d && d.v === 2) S = d; }
+    norm(S);
     const out = fn(S);
     S.posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     S.posts = S.posts.slice(0, A.MAX_POSTS);
@@ -66,7 +72,8 @@
     filter: 'all',
     me: store.get('hb2-me', null) || Object.assign({}, A.EXAMPLE_ME),
     delArm: null,
-    newProg: false
+    newProg: false,
+    rv: store.get('hb2-guest', null) || { name: '', phone: '', species: [], memo: '' }
   };
 
   function toast(msg) {
@@ -114,6 +121,21 @@
     const sp = SP[p.species], a = p.author;
     return `[해녀바당] ${p.promo}\n\n${sp.ko} ${p.grade}등급 ${kg(p.weightKg)}${p.askPerKg ? ` · kg당 ${won(p.askPerKg)}` : ''}\n연락: ${a.name} 해녀 ${a.phone}\n${a.place ? '만나는 곳: ' + a.place : ''}${a.hours ? ` (${a.hours})` : ''}\n${location.origin}/market/`;
   }
+  /* ---------- 먼저 보기 예약 ---------- */
+  const myWants = () => S.wants.filter((w) => w.ownerId === DEV);
+  const isEarly = (p) => p.earlyUntil && new Date(p.earlyUntil) > Date.now();
+  const canSeeEarly = (p) => p.ownerId === DEV || myWants().some((w) => w.matchedPostId === p.id);
+  const minsLeft = (t) => Math.max(1, Math.ceil((new Date(t) - Date.now()) / 60000));
+  const waitingFor = (sp) => S.wants.filter((w) => w.species === sp && !w.matchedPostId);
+  function teaser(p) {
+    const sp = SP[p.species];
+    return `<article class="card teaser">
+      <div class="row between"><h2>${esc(sp.ko)} <span class="muted small">${esc(p.grade)}등급</span></h2><span class="pill warn">예약 손님 먼저 보는 중</span></div>
+      <p style="margin:0">${esc(p.author.village)} 해녀가 방금 ${esc(sp.ko)}${josa(sp.ko, '을', '를')} 올렸어요. 미리 예약한 손님이 먼저 보고 있어요.</p>
+      <p class="muted small" style="margin:0"><b class="num">${minsLeft(p.earlyUntil)}분</b> 뒤에 모두에게 공개돼요. 다음부터 먼저 보고 싶으면 📅 버튼으로 예약하세요.</p>
+    </article>`;
+  }
+
   function postCard(p, owner) {
     const sp = SP[p.species];
     const sold = p.status === 'sold';
@@ -124,7 +146,10 @@
           ? `<button type="button" class="btn sm danger" data-act="del" data-id="${esc(p.id)}">정말 내리기</button><button type="button" class="btn sm" data-act="del-cancel">취소</button>`
           : `<button type="button" class="btn sm" data-act="del-arm" data-id="${esc(p.id)}">글 내리기</button>`}
       </div>`;
-    return `<article class="card ${sold ? 'sold' : ''}">
+    const early = !owner && isEarly(p) && canSeeEarly(p);
+    return `<article class="card ${sold ? 'sold' : ''} ${early ? 'match' : ''}">
+      ${early ? `<div class="banner">📅 예약하신 ${esc(sp.ko)}${josa(sp.ko, '이', '가')} 올라왔어요! 다른 손님보다 먼저 보고 있어요. ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개돼요.</div>` : ''}
+      ${owner && isEarly(p) ? `<div class="notice">예약 손님에게 먼저 보여주는 중 · ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개</div>` : ''}
       ${p.photo ? `<img class="photo" src="${esc(p.photo)}" alt="${esc(sp.ko)} 사진">` : ''}
       <div class="row between"><h2>${esc(sp.ko)} <span class="muted small">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
       <div class="kv"><span>${esc(ago(p.createdAt))} 올림</span><span>양 <b>${kg(p.weightKg)}</b></span>${p.example ? '<span class="pill info">예시 글</span>' : ''}</div>
@@ -146,6 +171,8 @@
       if (p) html += `<section class="card match">
         <div class="eyebrow">올렸어요</div>
         <h2>${esc(SP[p.species].ko)} 홍보 글이 손님 화면에 올라갔어요</h2>
+        ${(() => { const ws = S.wants.filter((w) => w.matchedPostId === p.id); return ws.length ? `<div class="banner">이 해산물을 기다리던 손님 ${ws.length}명이 ${A.EARLY_MIN}분 먼저 보고 있어요.</div>
+          <ul class="feed">${ws.map((w) => `<li><time>${esc(ago(w.createdAt))}</time><span><b>${esc(w.name)}</b>${w.memo ? ' · ' + esc(w.memo) : ''}${w.phone ? `<br><a href="tel:${esc(digits(w.phone))}">${esc(w.phone)}</a> <span class="muted small">먼저 전화해 보세요</span>` : '<br><span class="muted small">전화번호 없음, 손님이 연락해 올 거예요</span>'}</span></li>`).join('')}</ul>` : ''; })()}
         <p class="muted" style="margin:0">카카오톡 단체방이나 밴드에도 붙여 넣으면 더 많은 손님이 봐요. 거래는 손님 연락을 받고 직접 하시면 돼요.</p>
         <div class="row"><button type="button" class="btn primary" data-act="share" data-id="${esc(p.id)}">홍보 글 복사</button><button type="button" class="btn" data-act="dismiss-post">확인</button></div>
       </section>`;
@@ -161,6 +188,14 @@
           <span class="small" style="opacity:.8">망사리째 찍어도 돼요</span>
           ${waves}
         </label>`;
+      const waits = {};
+      S.wants.filter((w) => !w.matchedPostId).forEach((w) => { (waits[w.species] = waits[w.species] || []).push(w); });
+      html += `<section class="card"><h2>📅 손님이 기다리는 해산물</h2>
+        <p class="muted small" style="margin:0">물질 나가기 전에 보세요. 이 해산물을 올리면 예약한 손님이 ${A.EARLY_MIN}분 먼저 봐요.</p>
+        ${Object.keys(waits).length ? Object.entries(waits).map(([k, ws]) => `<div class="item"><div class="thumb" aria-hidden="true">${esc(SP[k].ko.slice(0, 1))}</div><div class="body">
+          <div class="row between"><h3>${esc(SP[k].ko)}</h3><span class="pill warn">${ws.length}명</span></div>
+          <div class="kv">${ws.map((w) => `<span>${esc(w.name)}${w.memo ? ' · ' + esc(w.memo) : ''}</span>`).join('')}</div></div></div>`).join('') : '<div class="empty">지금 기다리는 손님이 없어요.</div>'}
+      </section>`;
       return html;
     }
     html += d.photo ? `<img class="photo" src="${esc(d.photo)}" alt="방금 찍은 해산물 사진">` : '';
@@ -254,12 +289,42 @@
   /* ---------- 손님: 해산물 ---------- */
   function cMarket() {
     const kinds = [...new Set(S.posts.map((p) => p.species))];
+    const rank = (p) => (isEarly(p) && canSeeEarly(p) ? 0 : p.status === 'sold' ? 2 : 1);
     const list = S.posts.filter((p) => ui.filter === 'all' || p.species === ui.filter)
-      .sort((a, b) => (a.status === 'sold') - (b.status === 'sold') || new Date(b.createdAt) - new Date(a.createdAt));
-    return `<div class="stack"><div class="eyebrow">제주 해녀가 직접 알려요</div><h1>오늘 바다에서<br>올라온 해산물</h1></div>
+      .sort((a, b) => rank(a) - rank(b) || new Date(b.createdAt) - new Date(a.createdAt));
+    const arrived = myWants().filter((w) => w.matchedPostId).length;
+    return `<div class="row between" style="align-items:flex-start;flex-wrap:nowrap">
+        <div class="stack"><div class="eyebrow">제주 해녀가 직접 알려요</div><h1>오늘 바다에서<br>올라온 해산물</h1></div>
+        <button type="button" class="cal-btn" data-act="open-resv" aria-label="먼저 보기 예약${myWants().length ? ', 예약 ' + myWants().length + '개' : ''}" title="먼저 보기 예약"><span aria-hidden="true">📅</span>${arrived ? `<span class="badge num">${arrived}</span>` : myWants().length ? '<i class="cal-dot"></i>' : ''}</button>
+      </div>
       <div class="notice">해녀바당은 알리기만 도와요. 사고파는 건 해녀에게 전화나 문자로 직접 하세요. 수수료가 없어요.</div>
       <div class="chips"><button type="button" class="chip" data-act="filter" data-v="all" aria-pressed="${ui.filter === 'all'}">전체</button>${kinds.map((k) => `<button type="button" class="chip" data-act="filter" data-v="${k}" aria-pressed="${ui.filter === k}">${esc(SP[k].ko)}</button>`).join('')}</div>
-      ${list.length ? list.map((p) => postCard(p, false)).join('') : '<div class="empty">아직 올라온 해산물이 없어요. 물질 끝나는 오후에 다시 봐 주세요.</div>'}`;
+      ${list.length ? list.map((p) => (isEarly(p) && !canSeeEarly(p) ? teaser(p) : postCard(p, false))).join('') : '<div class="empty">아직 올라온 해산물이 없어요. 물질 끝나는 오후에 다시 봐 주세요.</div>'}`;
+  }
+
+  /* ---------- 손님: 먼저 보기 예약 ---------- */
+  function cReserve() {
+    const r = ui.rv, mine = myWants();
+    return `<button type="button" class="btn sm" data-act="close-resv" style="align-self:flex-start">← 해산물로 돌아가기</button>
+      <div class="stack"><div class="eyebrow">📅 먼저 보기 예약</div><h1>원하는 해산물을<br>미리 예약하세요</h1>
+      <p class="muted" style="margin:0">예약한 해산물이 올라오면 다른 손님보다 ${A.EARLY_MIN}분 먼저 볼 수 있어요. 해녀에게도 기다리는 손님으로 알려져서 먼저 연락이 갈 수 있어요. 돈은 내지 않아요.</p></div>
+      <section class="card">
+        <h3>어떤 해산물을 기다리세요? <span class="muted small" style="font-weight:400">여러 개 골라도 돼요</span></h3>
+        <div class="chips">${Object.entries(SP).map(([k, v]) => `<button type="button" class="chip" data-act="rv-species" data-v="${k}" aria-pressed="${r.species.includes(k)}">${esc(v.ko)}</button>`).join('')}</div>
+        <label class="field">이름<input type="text" id="rv-name" value="${esc(r.name)}" autocomplete="name" placeholder="해녀가 부를 이름"></label>
+        <label class="field">전화번호 (선택)<input type="text" id="rv-phone" value="${esc(r.phone)}" inputmode="tel" autocomplete="tel" placeholder="적으면 해녀가 먼저 연락할 수 있어요"></label>
+        <label class="field">해녀에게 한마디 (선택)<input type="text" id="rv-memo" value="${esc(r.memo)}" placeholder="예: 1kg 정도, 주말에 받고 싶어요"></label>
+        <button type="button" class="btn primary big" data-act="rv-save">예약하기</button>
+        <p class="muted small" style="margin:0">예약은 ${A.WANT_DAYS}일 동안 유지돼요. 전화번호는 해녀 화면에만 보여요.</p>
+      </section>
+      <section class="stack"><h2>내 예약</h2>${mine.length ? mine.map((w) => {
+        const p = w.matchedPostId && S.posts.find((x) => x.id === w.matchedPostId);
+        return `<div class="card ${p ? 'match' : ''}">
+          <div class="row between"><h3>${esc(SP[w.species].ko)}</h3>${p ? '<span class="pill warn">올라왔어요</span>' : '<span class="pill info">기다리는 중</span>'}</div>
+          <div class="kv"><span>${esc(ago(w.createdAt))} 예약</span>${w.memo ? `<span>${esc(w.memo)}</span>` : ''}</div>
+          <div class="row">${p ? `<button type="button" class="btn primary sm" data-act="rv-see" data-v="${esc(w.species)}">보러 가기</button>` : ''}<button type="button" class="btn sm" data-act="rv-cancel" data-id="${esc(w.id)}">${p ? '예약 끝내기' : '예약 취소'}</button></div>
+        </div>`;
+      }).join('') : '<div class="empty">아직 예약한 해산물이 없어요.</div>'}</section>`;
   }
 
   /* ---------- 손님: 체험 ---------- */
@@ -287,6 +352,9 @@
       { id: 'exp', label: '체험', icon: I.people, view: cExp }
     ]
   };
+  const HIDDEN = {
+    c: [{ id: 'reserve', view: cReserve }]
+  };
 
   function render() {
     if (!S) return;
@@ -295,7 +363,7 @@
     $('#role-c').setAttribute('aria-pressed', ui.role === 'c');
     $('#mode').innerHTML = `<span><i class="dot ${CONFIG.gemini ? 'on' : ''}"></i>사진 판별 ${CONFIG.gemini ? 'Gemini' : '데모'}</span><span><i class="dot ${CONFIG.shared ? 'on' : ''}"></i>${CONFIG.shared ? '모든 손님에게 공유' : '이 기기에만 저장'}</span>`;
     const tabs = TABS[ui.role];
-    const cur = tabs.find((t) => t.id === ui.tab[ui.role]) || tabs[0];
+    const cur = tabs.find((t) => t.id === ui.tab[ui.role]) || (HIDDEN[ui.role] || []).find((t) => t.id === ui.tab[ui.role]) || tabs[0];
     const ti = $('#tabs');
     ti.style.gridTemplateColumns = `repeat(${tabs.length}, minmax(0, 1fr))`;
     ti.innerHTML = tabs.map((t) => {
@@ -384,6 +452,15 @@
     d.rewriting = false; render();
   }
 
+  function keepRv() {
+    if ($('#rv-name')) { ui.rv.name = $('#rv-name').value.trim(); ui.rv.phone = $('#rv-phone').value.trim(); ui.rv.memo = $('#rv-memo').value.trim(); }
+  }
+  // 먼저 보기 남은 시간이 흐르도록 30초마다 다시 그림 (입력 중이면 건너뜀)
+  setInterval(() => {
+    const busy = document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
+    if (S && !busy && ui.draft.status === 'idle' && S.posts.some((p) => p.earlyUntil)) render();
+  }, 30000);
+
   /* ---------- 동작 ---------- */
   document.addEventListener('change', (e) => {
     if (e.target.id === 'cam' && e.target.files[0]) onPhoto(e.target.files[0]);
@@ -418,6 +495,8 @@
               refPerKg: A.refPrice(d), askPerKg: d.askPerKg, photo: d.photo || null,
               promo: d.promo, createdAt: new Date().toISOString(), status: 'open'
             };
+            const ws = s.wants.filter((w) => w.species === post.species && !w.matchedPostId);
+            if (ws.length) { post.earlyUntil = new Date(Date.now() + A.EARLY_MIN * 60000).toISOString(); ws.forEach((w) => { w.matchedPostId = post.id; }); }
             s.posts.unshift(post); return post;
           });
           ui.lastPost = p.id; ui.draft = { status: 'idle' }; render(); window.scrollTo(0, 0);
@@ -437,6 +516,29 @@
         ui.tab.h = ui.draft.status === 'ready' ? 'upload' : 'me'; render();
         break;
       }
+      case 'open-resv': ui.tab.c = 'reserve'; render(); window.scrollTo(0, 0); break;
+      case 'close-resv': ui.tab.c = 'market'; render(); window.scrollTo(0, 0); break;
+      case 'rv-species': { const i = ui.rv.species.indexOf(v); if (i >= 0) ui.rv.species.splice(i, 1); else ui.rv.species.push(v); keepRv(); render(); break; }
+      case 'rv-save': {
+        keepRv();
+        const r = ui.rv;
+        if (!r.species.length) { toast('기다리는 해산물을 하나 이상 골라 주세요.'); break; }
+        if (!r.name) { toast('이름을 적어 주세요.'); break; }
+        store.set('hb2-guest', r);
+        run(async () => {
+          await mutate((s) => {
+            r.species.forEach((sp) => {
+              if (s.wants.some((w) => w.ownerId === DEV && w.species === sp && !w.matchedPostId)) return;
+              s.wants.unshift({ id: A.uid('w'), ownerId: DEV, name: r.name, phone: r.phone, memo: r.memo, species: sp, createdAt: new Date().toISOString(), matchedPostId: null });
+            });
+          });
+          ui.rv.species = []; store.set('hb2-guest', ui.rv); render();
+          toast('예약했어요. 올라오면 먼저 보여 드릴게요.');
+        });
+        break;
+      }
+      case 'rv-cancel': run(() => mutate((s) => { s.wants = s.wants.filter((w) => w.id !== b.dataset.id); })); break;
+      case 'rv-see': ui.tab.c = 'market'; ui.filter = v; render(); window.scrollTo(0, 0); break;
       case 'pg-new': ui.newProg = true; render(); break;
       case 'pg-cancel': ui.newProg = false; render(); break;
       case 'pg-save': {
@@ -458,7 +560,7 @@
     if (!CONFIG.shared) return;
     const busy = document.activeElement && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName);
     if (busy || ui.draft.status !== 'idle') return;
-    fetchShared().then((d) => { if (d && d.v === 2) { S = d; render(); } }).catch(() => {});
+    fetchShared().then((d) => { if (d && d.v === 2) { S = norm(d); render(); } }).catch(() => {});
   }, 30000);
 
   /* ---------- 시작 ---------- */
@@ -468,6 +570,7 @@
       if (res.ok && (res.headers.get('content-type') || '').includes('json')) CONFIG = Object.assign(CONFIG, await res.json());
     } catch { /* 서버가 없으면 미리보기 */ }
     await load();
+    norm(S);
     render();
   })();
 })();

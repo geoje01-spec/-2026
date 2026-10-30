@@ -193,3 +193,10 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 0; width: 100%; }
 .notice { background: var(--info-bg); color: var(--info); border-radius: 12px; padding: 12px 14px; font-weight: 700; }
 textarea { min-height: 110px; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); width: 100%; font: inherit; color: inherit; resize: vertical; font-weight: 400; }
 .btn.danger { background: #c2261f; border-color: #c2261f; color: #fff; }
+
+/* 먼저 보기 예약 */
+.cal-btn { position: relative; flex: none; width: 44px; height: 44px; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); font-size: 20px; line-height: 1; cursor: pointer; display: grid; place-items: center; margin-top: 4px; }
+.cal-btn:hover { border-color: var(--sea-2); }
+.cal-btn .badge { top: -4px; left: auto; right: -4px; }
+.cal-dot { position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--tewak); border: 2px solid var(--surface); }
+.card.teaser { border-style: dashed; }

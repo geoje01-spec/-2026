@@ -22,6 +22,8 @@
   const GRADES = { '특': 1.2, '상': 1.0, '중': 0.85 };
   const FRESH = { '최상': 1.05, '좋음': 1, '보통': 0.95 };
   const MAX_POSTS = 20;
+  const EARLY_MIN = 30;        // 예약 손님이 먼저 보는 시간(분)
+  const WANT_DAYS = 14;        // 예약은 14일 지나면 자동으로 지움
 
   const uid = (p) => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const round100 = (n) => Math.round(n / 100) * 100;
@@ -68,6 +70,10 @@
         mk(a1, 'seaweed', '상', '좋음', 4, null, 5),
         mk(a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold')
       ],
+      wants: [
+        { id: 'w-seed1', ownerId: 'seed', example: true, name: '박지은(예시)', phone: '010-0000-0002', species: 'urchinroe', memo: '0.5kg 정도', createdAt: h(20), matchedPostId: null },
+        { id: 'w-seed2', ownerId: 'seed', example: true, name: '이도윤(예시)', phone: '', species: 'octopus', memo: '', createdAt: h(9), matchedPostId: null }
+      ],
       programs: [
         { id: 'pg1', ownerId: 'seed', example: true, author: a1, title: '해녀와 함께하는 물질 체험', desc: '해녀 삼촌에게 테왁 잡는 법과 숨 고르는 법을 배우고 얕은 바다에서 소라를 직접 찾아봐요.', price: 70000, times: '오전 10시, 오후 2시 (2시간)', season: '5~10월, 물때와 날씨에 따라 쉬어요' },
         { id: 'pg2', ownerId: 'seed', example: true, author: a2, title: '불턱 이야기와 해녀 밥상', desc: '물질 뒤 몸을 녹이던 불턱에 둘러앉아 해녀 이야기를 듣고, 그날 잡은 해산물로 차린 밥상을 함께 먹어요.', price: 45000, times: '낮 12시, 저녁 5시 30분 (1시간 30분)', season: '사계절' }
@@ -75,7 +81,7 @@
     };
   }
 
-  const api = { SPECIES, GRADES, FRESH, MAX_POSTS, EXAMPLE_ME, uid, refPrice, promo, seed };
+  const api = { SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);
