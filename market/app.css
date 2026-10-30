@@ -200,3 +200,5 @@ textarea { min-height: 110px; border: 1.5px solid var(--line); border-radius: 10
 .cal-btn .badge { top: -4px; left: auto; right: -4px; }
 .cal-dot { position: absolute; top: 2px; right: 2px; width: 10px; height: 10px; border-radius: 50%; background: var(--tewak); border: 2px solid var(--surface); }
 .card.teaser { border-style: dashed; }
+.small-chips .chip { min-height: 36px; padding: 5px 11px; font-size: 14px; font-weight: 600; }
+.want-list { display: flex; flex-direction: column; gap: 2px; font-size: 15px; }

@@ -50,6 +50,21 @@
     return v[(variant || 0) % v.length];
   }
 
+  // 손님이 직접 적은 글에서 해산물을 알아봄 (예: "뿔소라 2kg" → 소라)
+  const ALIASES = {
+    abalone: ['전복'], obunjagi: ['오분자기', '떡조개'], turban: ['소라', '뿔소라'],
+    octopus: ['문어', '돌문어', '참문어', '피문어'], seacucumber: ['해삼'],
+    urchinroe: ['성게알', '성게 알', '우니', '성게'], urchin: ['통성게', '성게(통)', '성게 통'],
+    seaweed: ['미역'], hijiki: ['톳'], agar: ['우뭇가사리', '우무', '천초']
+  };
+  function detect(text) {
+    const t = String(text || '');
+    const hit = Object.keys(ALIASES).filter((k) => ALIASES[k].some((a) => t.includes(a)));
+    // "통성게"를 적었으면 성게알로 따로 잡지 않음
+    if (hit.includes('urchin') && hit.includes('urchinroe') && !/성게\s?알|우니/.test(t)) return hit.filter((k) => k !== 'urchinroe');
+    return hit;
+  }
+
   const EXAMPLE_ME = { name: '김순덕(예시)', village: '하도 어촌계', phone: '010-0000-0000', place: '하도 어촌계 해녀 판매장', hours: '물질 끝나고 오후 3~5시' };
 
   function seed() {
@@ -71,8 +86,8 @@
         mk(a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold')
       ],
       wants: [
-        { id: 'w-seed1', ownerId: 'seed', example: true, name: '박지은(예시)', phone: '010-0000-0002', species: 'urchinroe', memo: '0.5kg 정도', createdAt: h(20), matchedPostId: null },
-        { id: 'w-seed2', ownerId: 'seed', example: true, name: '이도윤(예시)', phone: '', species: 'octopus', memo: '', createdAt: h(9), matchedPostId: null }
+        { id: 'w-seed1', ownerId: 'seed', example: true, name: '박지은(예시)', phone: '010-0000-0002', text: '성게알 0.5kg 정도, 주말에 받고 싶어요', species: ['urchinroe'], createdAt: h(20), matchedPostId: null },
+        { id: 'w-seed2', ownerId: 'seed', example: true, name: '이도윤(예시)', phone: '', text: '돌문어 큰 걸로 한 마리', species: ['octopus'], createdAt: h(9), matchedPostId: null }
       ],
       programs: [
         { id: 'pg1', ownerId: 'seed', example: true, author: a1, title: '해녀와 함께하는 물질 체험', desc: '해녀 삼촌에게 테왁 잡는 법과 숨 고르는 법을 배우고 얕은 바다에서 소라를 직접 찾아봐요.', price: 70000, times: '오전 10시, 오후 2시 (2시간)', season: '5~10월, 물때와 날씨에 따라 쉬어요' },
@@ -81,7 +96,7 @@
     };
   }
 
-  const api = { SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed };
+  const api = { detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);
