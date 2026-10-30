@@ -834,27 +834,75 @@ async function runTool(name,args){
   return {error:"알 수 없는 도구"};
 }
 const TOOL_LABEL={send_check_message:"해녀에게 확인 신호 보내기",get_divers_status:"해녀 상태 조회",check_sea_conditions:"실측 수온 조회",get_sea_forecast:"기상청 해상예보 조회",open_emergency_report:"신고 화면 열기"};
-const SYSTEM=()=>`너는 '숨비 지킴이' 해녀 안전 도우미다. 사용자는 해녀 또는 해녀를 돌보는 관리자다.
-- 쉬운 우리말로, 짧고 분명하게 답한다. 어르신도 이해할 수 있게 전문용어는 풀어서 말한다. 마크다운 기호(**, #)는 쓰지 않는다.
-- 아래 '지금 화면의 데이터'에 답이 있으면 도구를 부르지 말고 바로 답한다. 다른 바다를 묻거나 데이터가 없을 때만 도구를 쓴다. 값을 지어내지 않는다.
-- 답은 3~5문장 정도로 짧게 한다.
-- 오늘 물질 여부는 수온 판정을 그대로 따르고, 이유와 실천할 조언(물질 시간, 휴식, 보온, 동료와 함께)을 덧붙인다.
-- 며칠 뒤 계획은 get_sea_forecast를 쓴다. 이 예보는 4~10일 뒤만 있으니 1~3일 뒤는 예보가 없다고 솔직히 말한다.
-- 위급이 감지되면 앱이 해녀에게 확인 신호를 보내고, 응답이 없을 때만 비상으로 판단해 신고한다. 사용자가 특정 해녀가 괜찮은지 확인해 달라고 하면 send_check_message를 쓴다. 신고 화면은 데모데이 시연용 모의 신고이며 실제로 보냈다고 말하지 않는다.
-- 사람이 위험해 보이면 해양경찰 122, 119에 바로 전화하라고 안내한다.
-- 오늘(한국 시각): ${kstNow().toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric",weekday:"long"})}. 사용자가 고른 오늘 바다: ${station(S.site)?.name||S.site}.
-[지금 화면의 데이터]
+// 수온별 물질 가이드 (앱 기준, 참고용). AI가 막연한 말 대신 이 숫자로 답하게 함
+function diveGuide(t){
+  if(t==null||Number.isNaN(t)) return null;
+  if(t<S.t.seaMin) return {call:"오늘은 쉬세요", dive:"물질은 하지 말고", rest:"망사리 손질하며 쉬세요", tip:"이 수온에선 몇십 분 만에 손발이 굳고 판단이 흐려져요"};
+  if(t<S.t.seaWarn) return {call:"짧게만 들어가세요", dive:"한 번에 40분 안쪽으로 하고", rest:"나와서 불턱에서 20분은 몸을 녹이세요", tip:"오늘은 두 번까지만 들어가고, 두꺼운 잠수복과 장갑을 챙기세요"};
+  if(t<=20) return {call:"들어가도 돼요", dive:"한 번에 1시간 정도 하고", rest:"나와서 15분은 쉬세요", tip:"입술이 파래지거나 손이 떨리면 그날은 바로 올라오세요"};
+  if(t<=S.t.seaHigh) return {call:"들어가기 좋은 물이에요", dive:"한 번에 1시간 30분 정도 하고", rest:"나와서 15분 쉬며 물을 꼭 드세요", tip:"물이 따뜻하다고 오래 있으면 숨이 짧아지니 욕심내지 마세요"};
+  return {call:"짧게 나눠 들어가세요", dive:"한 번에 1시간 안쪽으로 하고", rest:"그늘에서 20분 쉬며 물을 드세요", tip:"더운 날은 탈수와 어지럼증이 먼저 오니 조심하세요"};
+}
+const SYSTEM=()=>{
+  const sea=fresh(LAST.sea)?LAST.sea.r:null, g=sea?diveGuide(sea.temp):null;
+  const ds=diversStatus(), bad=ds.filter(d=>d.level!=="정상");
+  return `너는 '숨비 지킴이'다. 제주 어촌계 해녀들의 물질 안전을 챙기는 관제 도우미로, 불턱에서 해녀 삼촌들과 오래 지낸 사람처럼 말한다.
+듣는 사람: 해녀 어르신 또는 해녀회장·어촌계 관리자.
+
+[말하는 방식]
+- 첫 문장에 결론부터. "들어가도 돼요" / "짧게만 들어가세요" / "오늘은 쉬세요"처럼 딱 잘라 말한다.
+- 그다음 근거를 숫자로 한두 개 (수온 몇 도, 파고 몇 m, 누가 몇 초째 신호 없음).
+- 마지막에 지금 할 일 한 가지를 구체적으로 (몇 분 물질, 몇 분 쉬기, 누구에게 무엇을).
+- 전체 2~4문장. 목록은 날짜별 예보처럼 꼭 필요할 때만.
+- 말투는 다정한 존댓말 구어체("~요"). 물질, 불턱, 테왁, 망사리, 숨비소리, 물때 같은 말을 자연스럽게 쓴다. 해녀 이름이 있으면 이름을 부른다.
+- 쓰지 않는 말: "안전에 유의하세요", "~하시기 바랍니다", "참고로", "중요합니다", "도움이 되셨길", "궁금한 점이 있으면", "AI로서", 느낌표 여러 개, 이모지, 별표(**)와 #.
+- 모르는 건 모른다고 한다. 데이터에 없는 수온·파고·건강 수치를 지어내지 않는다.
+
+[판단 규칙]
+- 오늘 물질 여부는 아래 '물질 가이드'와 수온 판정을 그대로 따른다. 가이드의 물질 시간·휴식 시간을 그대로 인용한다.
+- 며칠 뒤는 get_sea_forecast. 이 예보는 4~10일 뒤만 있다. 1~3일 뒤는 "아직 예보가 없어요, 전날 저녁에 다시 물어보세요"라고 한다. 파고 2.5m 이상은 주의, 3m 이상은 쉬는 날.
+- 해녀가 위험해 보이면 이름과 상황을 먼저 말하고, 앱이 확인 신호를 보내는지 알려준다. 특정 해녀 확인을 부탁받으면 send_check_message.
+- 신고 화면은 데모데이 시연용 모의 신고다. 실제로 신고했다고 말하지 않는다. 진짜 위급이면 해양경찰 122, 119에 바로 전화하라고 한다.
+- 아래 데이터에 답이 있으면 도구를 부르지 말고 바로 답한다. 다른 바다를 묻거나 데이터가 없을 때만 도구를 쓴다.
+
+[좋은 답 예시]
+질문: 오늘 물질해도 돼?
+답: 들어가도 돼요. 성산포 물이 18.4도라 한 번에 1시간 정도 하고, 나와서 15분 쉬면 충분해요. 입술이 파래지거나 손이 떨리면 그날은 바로 올라오세요.
+
+질문: 해녀들 상태 어때?
+답: 고옥자 삼촌만 살펴보면 돼요. 맥박이 168회로 높게 나와요. 지금 물 밖에 계시면 불턱에서 10분 숨 고르고 다시 재 보세요. 나머지 두 분은 괜찮아요.
+
+질문: 다음 주 파도 어때?
+답: 화요일까지는 1~2m라 물질하기 괜찮아요. 금요일은 2~3m로 높아지니 그날은 쉬는 게 좋아요. 1~3일 뒤 바다는 아직 예보가 없어요.
+
+[지금 데이터]
+오늘(한국 시각): ${kstNow().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})} ${kstNow().getHours()}시. 고른 바다: ${station(S.site)?.name||S.site}.
+오늘 수온: ${sea?`${sea.site} ${sea.temp}℃ (관측 ${sea.obsTime||"시각 모름"}), 판정 ${sea.verdict}`:"아직 없음(도구 사용)"}
+물질 가이드(앱 기준): ${g?`${g.call} · ${g.dive} · ${g.rest} · ${g.tip}`:"수온이 있어야 나옴"}
+해녀 ${ds.length}명: ${ds.length?ds.map(d=>`${d.name} ${d.level}${d.level!=="정상"?"("+d.reasons.join(", ")+")":""}${d.bpm?` 맥박 ${d.bpm}`:""}${d.seconds_since_signal!=null&&d.seconds_since_signal>20?` 신호끊김 ${d.seconds_since_signal}초`:""}`).join(" / "):"신호 없음"}
+살펴볼 사람: ${bad.length?bad.map(d=>d.name).join(", "):"없음"}
 비상 처리: ${emgStatus()}
-해녀 상태: ${JSON.stringify(diversStatus().map(d=>({이름:d.name,단계:d.level,이유:d.reasons,맥박:d.bpm,무움직임초:d.still_sec,신호끊김초:d.seconds_since_signal})))}
-오늘 수온: ${fresh(LAST.sea)?JSON.stringify({바다:LAST.sea.r.site,수온:LAST.sea.r.temp,판정:LAST.sea.r.verdict,이유:LAST.sea.r.reasons,관측:LAST.sea.r.obsTime}):"아직 없음(도구 사용)"}
-파고 전망(4~10일 뒤, ${fresh(LAST.fcst)?LAST.fcst.r.regName:""}): ${fresh(LAST.fcst)?JSON.stringify(LAST.fcst.r.days.map(d=>[d.date,`${d.waveMin}~${d.waveMax}m`,d.weather,["적합","주의","부적합"][d.level]])):"아직 없음(도구 사용)"}`;
+파고 전망(4~10일 뒤, ${fresh(LAST.fcst)?LAST.fcst.r.regName:""}): ${fresh(LAST.fcst)?LAST.fcst.r.days.map(d=>`${d.date} ${d.waveMin}~${d.waveMax}m ${d.weather}`).join(", "):"아직 없음(도구 사용)"}`;
+};
+const wv=d=>d.waveMin===d.waveMax?`${d.waveMax}m`:`${d.waveMin}~${d.waveMax}m`;
+function sayReason(r){
+  r=String(r||"").replace(/\s*\(.*\)$/,"");
+  const m=r.match(/^맥박 (\d+)/); if(m) return `맥박이 ${m[1]}회로 ${+m[1]>=100?"높아요":"낮아요"}.`;
+  return r.replace(/회\/분/,"회")+".";
+}
+// AI 답에서 기계적인 표현을 걷어냄
+function tidy(t){
+  return String(t||"").replace(/\*\*|__|^#+\s*/gm,"").replace(/!{2,}/g,"!")
+    .replace(/\s*(안전(한 물질)?에 (각별히 )?유의하세요\.?|도움이 되(셨|었)(길|으면) (바랍니다|좋겠어요)\.?|궁금한 (점|것)이 있으(시)?면[^.]*\.?)\s*$/,"")
+    .replace(/\n{3,}/g,"\n\n").trim();
+}
 let history=[];
 // 생각 단계를 줄여 빠르게. 모델마다 받는 설정이 달라서, 거부당하면 다음 방식으로 바꿔 재시도
 const THINK_MODES=[{thinkingBudget:0},{thinkingLevel:"minimal"},{thinkingLevel:"low"},null];
 let thinkIdx=0; try{ thinkIdx=+(localStorage.getItem("sumbi-think")||0)||0; }catch(e){}
 let sysNow="";
 async function gemini(contents,noTools){
-  const req={systemInstruction:{parts:[{text:sysNow||SYSTEM()}]},contents,generationConfig:{temperature:0.4}};
+  const req={systemInstruction:{parts:[{text:sysNow||SYSTEM()}]},contents,generationConfig:{temperature:0.3,topP:0.9}};
   if(!noTools) req.tools=TOOLS;
   const tm=THINK_MODES[thinkIdx]; if(tm) req.generationConfig.thinkingConfig=tm;
   const body=JSON.stringify(req);
@@ -876,7 +924,7 @@ async function agentLLM(text){
   for(let step=0;step<6;step++){
     const c=await gemini(history); history.push(c);
     const calls=(c.parts||[]).filter(p=>p.functionCall);
-    if(!calls.length){ const out=(c.parts||[]).map(p=>p.text||"").join("").trim(); trimHistory(); return out||"(답이 비어 있어요)"; }
+    if(!calls.length){ const out=tidy((c.parts||[]).map(p=>p.text||"").join("")); trimHistory(); return out||"(답이 비어 있어요)"; }
     const resp=[];
     for(const p of calls){ const {name,args}=p.functionCall; say("tool","🔧 "+(TOOL_LABEL[name]||name)); resp.push({functionResponse:{name,response:{result:await runTool(name,args||{})}}}); }
     history.push({role:"user",parts:resp});
@@ -901,23 +949,23 @@ async function agentRule(text){
     say("tool","🔧 실측 수온 조회");
     const r=await runTool("check_sea_conditions",{site:st?.code});
     if(r.error) parts.push("수온을 가져오지 못했어요: "+r.error);
-    else parts.push(`${r.site} 수온은 ${r.temp}℃예요. 판단: ${r.verdict}.\n- ${r.reasons.join("\n- ")}`+
-      (r.level===0?"\n동료와 함께 들어가고 1시간마다 몸을 녹이세요.":r.level===1?"\n평소보다 물질 시간을 줄이고 보온에 신경 쓰세요.":"\n오늘은 물질을 쉬는 것이 안전해요."));
+    else{ const g=diveGuide(r.temp); parts.push(`${g.call}. ${r.site.replace("제주 ","")} 물이 ${r.temp}도라 ${g.dive}, ${g.rest}. ${g.tip}.`); }
   }
   if(wantsFcst){
     say("tool","🔧 기상청 해상예보 조회");
     const f=await runTool("get_sea_forecast",{site:st?.code});
     if(f.error) parts.push("해상예보를 가져오지 못했어요: "+f.error);
     else{ const good=f.days.filter(d=>d.level===0).map(d=>d.date), bad=f.days.filter(d=>d.level===2).map(d=>d.date);
-      parts.push(`${f.regName} 바다 파고 전망이에요 (4~10일 뒤).\n`+f.days.map(d=>`- ${d.date}: ${d.waveMin}~${d.waveMax}m ${d.weather}`).join("\n")+
-        `\n\n물질하기 좋은 날: ${good.join(", ")||"없음"}`+(bad.length?`\n피해야 할 날: ${bad.join(", ")}`:"")); }
+      const calm=[...f.days].sort((a,b)=>a.waveMax-b.waveMax)[0];
+      parts.push((bad.length?`${bad.join(", ")}은 파도가 높아 쉬는 날로 잡으세요. `:`일주일 내내 파도가 ${Math.max(...f.days.map(d=>d.waveMax))}m 아래라 쉴 날은 없어요. `)+(calm?`제일 잔잔한 날은 ${calm.date}, ${wv(calm)}예요.`:"")+
+        `\n`+f.days.map(d=>`${d.date} ${wv(d)} ${d.weather}`).join("\n")+`\n1~3일 뒤 바다는 아직 예보가 없어요.`); }
   }
   if(wantsHealth || (!wantsSea && !wantsFcst && !parts.length)){
     say("tool","🔧 해녀 상태 조회");
     const {divers:list}=await runTool("get_divers_status",{});
     if(!list.length) parts.push("아직 해녀 신호가 없어요.");
     else{ const bad=list.filter(d=>d.level!=="정상");
-      parts.push(bad.length? "살펴봐야 할 분:\n"+bad.map(d=>`- ${d.name}: ${d.level} (${d.reasons.join(", ")})`).join("\n") : `해녀 ${list.length}명 모두 정상이에요.`); }
+      parts.push(bad.length? bad.map(d=>`${d.name} 삼촌을 살펴보세요. ${sayReason(d.reasons[0])} ${d.level==="위급"?"앱이 확인 신호를 보내고 있어요.":"물 밖에 계시면 불턱에서 10분 숨 고르게 해 주세요."}`).join(" ")+(list.length>bad.length?` 나머지 ${list.length-bad.length}분은 괜찮아요.`:"") : `${list.length}분 모두 괜찮아요. 신호도 잘 들어오고 있어요.`); }
   }
   return parts.join("\n\n");
 }
@@ -927,7 +975,7 @@ async function ask(text){
   const wait=say("bot","생각 중…");
   try{
     let out;
-    if(aiReady()){ try{ out=await agentLLM(text); }catch(e){ history=[]; out=`(${e.message}) 규칙 기반으로 대신 답할게요.\n\n`+await agentRule(text); } }
+    if(aiReady()){ try{ out=await agentLLM(text); }catch(e){ history=[]; console.warn(e); out=await agentRule(text); toast("AI 연결이 안 돼서 앱 기준으로 답했어요"); } }
     else out=await agentRule(text);
     wait.textContent=out;
   }catch(e){ wait.textContent="오류: "+(e.message||e); }
