@@ -53,27 +53,44 @@ async function call(key, extra) {
   return { status: r.status, j, text };
 }
 
+// 수산물 부류(600)의 품목 코드 후보. 이 API가 품목 코드를 꼭 요구하면 하나씩 물어봄
+const ITEM_CODES = Array.from({ length: 60 }, (_, i) => String(601 + i));
+
 module.exports = async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   const key = process.env.DATA_GO_KEY;
   if (!key) return res.status(500).json({ error: "Vercel에 DATA_GO_KEY 환경변수가 없어요" });
   const raw = !!req.query.raw;
   if (!raw && cache.data && Date.now() - cache.at < 3 * 3600 * 1000) return res.status(200).json(cache.data);
-  const tries = [{ "cond[ctgry_cd::EQ]": "600" }, {}];   // 600 = 수산물 부류. 안 되면 전체를 받아서 거름
   const log = [];
+  const done = (items, how) => {
+    const rows = items.map(normalize).filter((r) => r.item && (r.perKg || r.price));
+    const fish = rows.filter((r) => /수산/.test(r.cls || "") || /^6/.test(String(r.clsCd || "")));
+    const data = { ok: true, source: "aT 최근일자 도·소매가격", how, date: (fish[0] || rows[0] || {}).date || null, rows: fish.length ? fish : rows, filtered: !!fish.length };
+    cache = { at: Date.now(), data };
+    if (raw) return res.status(200).json({ how, 원본_예시: items.slice(0, 5), 해석_예시: items.slice(0, 5).map(normalize), 수산물_건수: fish.length, log });
+    return res.status(200).json(data);
+  };
   try {
-    for (const extra of tries) {
+    // 1) 부류만 주고 한 번에 받기
+    for (const extra of [{ "cond[ctgry_cd::EQ]": "600" }, {}]) {
       const { status, j, text } = await call(key, extra);
       const items = j ? findItems(j) || [] : [];
-      log.push({ 조건: extra, status, 건수: items.length, 응답: j ? (j.response?.header || j.header || null) : text.slice(0, 300) });
-      if (raw && items.length) return res.status(200).json({ 조건: extra, 원본_예시: items.slice(0, 5), 해석_예시: items.slice(0, 5).map(normalize), log });
-      if (!items.length) continue;
-      const rows = items.map(normalize).filter((r) => r.item && (r.perKg || r.price));
-      const fish = rows.filter((r) => /수산/.test(r.cls || "") || /^6/.test(String(r.clsCd || "")));
-      const data = { ok: true, source: "aT 최근일자 도·소매가격", date: (fish[0] || rows[0] || {}).date || null, rows: fish.length ? fish : rows, filtered: !!fish.length };
-      cache = { at: Date.now(), data };
-      return res.status(200).json(data);
+      log.push({ 조건: extra, status, 건수: items.length, 응답: text.slice(0, 400) });
+      if (items.length) return done(items, "부류 조회");
     }
+    // 2) 품목 코드가 필요하면 수산물 품목을 하나씩 (동시에 10개씩)
+    const all = [];
+    for (let i = 0; i < ITEM_CODES.length; i += 10) {
+      const part = await Promise.all(ITEM_CODES.slice(i, i + 10).map((c) =>
+        call(key, { "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": c }).then((r) => ({ c, ...r })).catch((e) => ({ c, status: 0, text: String(e) }))));
+      for (const r of part) {
+        const items = r.j ? findItems(r.j) || [] : [];
+        if (items.length) all.push(...items);
+        else if (log.length < 6) log.push({ 품목코드: r.c, status: r.status, 응답: (r.text || "").slice(0, 200) });
+      }
+    }
+    if (all.length) return done(all, "품목별 조회");
     return res.status(502).json({ error: "시세 자료를 찾지 못했어요", log });
   } catch (e) {
     return res.status(502).json({ error: "시세 API 연결 실패: " + e.message, log });
