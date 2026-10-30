@@ -1,4 +1,4 @@
-// 해녀바당 마켓: 해산물 사진을 Gemini로 판별 (품목, 개수, 무게, 등급, 신선도)
+// 해녀바당: 해산물 사진을 Gemini로 판별 (품목, 개수, 무게, 등급, 신선도) + 홍보 글 초안
 const SPECIES = {
   abalone: "전복", obunjagi: "오분자기", turban: "소라", octopus: "문어", seacucumber: "해삼",
   urchinroe: "성게알", urchin: "성게(통)", seaweed: "미역", hijiki: "톳", agar: "우뭇가사리",
@@ -11,7 +11,8 @@ const PROMPT = `해녀가 잡은 해산물 사진이다. 사진을 보고 아래
  "grade": "특" | "상" | "중" (크기와 상태 기준),
  "freshness": "최상" | "좋음" | "보통",
  "confidence": 0~1 사이 확신도,
- "notes": 해녀 어르신이 읽을 쉬운 한국어 한두 문장 (무엇으로 보았는지, 확인할 점)}`;
+ "notes": 해녀 어르신이 읽을 쉬운 한국어 한두 문장 (무엇으로 보았는지, 확인할 점),
+ "promo": 손님에게 알리는 홍보 글. 제주 해녀 어르신의 따뜻한 말투로 2~3문장, 품목과 싱싱함을 살려서. 가격·전화번호·이모지·해시태그는 넣지 말 것}`;
 
 async function call(model, key, body) {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {

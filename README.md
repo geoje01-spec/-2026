@@ -13,7 +13,8 @@ API 키는 이 저장소에 넣지 않습니다. Vercel 환경변수로 넣습�
 - `DATA_GO_KEY` 공공데이터포털 일반 인증키(Encoding)
 - `GEMINI_KEY` Google AI Studio Gemini 키
 
-## 해녀바당 마켓 (`/market/`)
-해녀가 사진으로 해산물을 올리면 가격·예약 매칭·배송 일정을 에이전트가 잡아주는 직거래 앱.
+## 해녀바당 (`/market/`)
+해녀가 사진을 올려 해산물·체험을 알리는 홍보 게시판. 거래는 손님이 해녀에게 전화·문자로 직접 함 (주문·결제·배송 없음, 수수료 없음).
 - 주소: 배포 주소 뒤에 `/market/`
-- 사진 판별은 `api/analyze.js`(Gemini, 같은 GEMINI_KEY 사용), 판매·예약 데이터는 각 기기 브라우저에 저장
+- 사진 판별과 홍보 글: `api/analyze.js`, `api/gemini.js` (GEMINI_KEY)
+- 모든 손님이 같은 글을 보려면: Vercel → Storage(또는 Marketplace) → Upstash Redis 연결. 연결 전에는 각 기기에만 저장
