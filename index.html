@@ -549,7 +549,9 @@ function spark(hist){
 }
 function renderDivers(){
   const box=$("divers"); const ids=[...divers.keys()].sort((a,b)=>a-b);
-  if(!ids.length){ box.innerHTML=`<p class="note">아직 받은 신호가 없어요. 해녀용 마이크로비트를 켜거나 시뮬레이션을 켜세요.</p>`; return; }
+  if(!ids.length){ box.innerHTML=port
+    ? `<p class="note">마이크로비트가 연결됐어요. 신호를 기다리는 중이에요. 부표 마이크로비트는 해녀가 <b>처음 물에 들어갈 때</b>부터 알려 주니, 해녀용 마이크로비트를 켜고 한 번 들어갔다 나오면 카드가 생겨요.</p>`
+    : `<p class="note">아직 받은 신호가 없어요. 해녀용 마이크로비트를 켜거나 시뮬레이션을 켜세요.</p>`; return; }
   box.innerHTML=ids.map(id=>{
     const d=divers.get(id), k=d.last||{}, lost=d.lastAt?Math.round((now()-d.lastAt)/1000):0;
     const under=d.lastAt && lost>SURF_GAP;
