@@ -451,10 +451,12 @@ function ingest(line){
   const d=diver(id);
   // 라디오가 다시 잡힘 = 물 위로 올라옴. 끊겨 있던 시간이 한 번의 잠수 시간
   const gap=d.lastAt?(now()-d.lastAt)/1000:0;
-  if(d.lastAt && gap>SURF_GAP){
+  if(d.lastAt && gap>gapOf(d) && isBuoy(d) && gap<BUOY_BLIP){ d.under=false; d.shortRest=false; }   // 부표: 잠깐 끊긴 건 잠수로 치지 않음
+  else if(d.lastAt && gap>gapOf(d)){
     const len=Math.round(gap); d.dives.push({len,end:now()}); if(d.dives.length>200) d.dives.shift();
+    if(isBuoy(d)) log(`${nameOf(id)}: ${fmtSec(len)} 잠수 후 물 위로 올라옴 (부표 알림)`);
     d.under=false; d.surfacedAt=now(); d.shortRest=false;
-    if(len>=S.t.lostWarn) log(`${nameOf(id)}: ${len}초 잠수 후 물 위로 올라옴`);
+    if(!isBuoy(d) && len>=S.t.lostWarn) log(`${nameOf(id)}: ${len}초 잠수 후 물 위로 올라옴`);
     if(d.pendingRecall){ d.pendingRecall=false; sendLine(`R,${id}`); log(`${nameOf(id)}: 올라와서 미뤄둔 휴식 신호 전달`); }
     if(emg.active && emg.diver===d && emg.stage===1 && emg.under) setTimeout(()=>onSurface(id,len),0);
   }
@@ -469,11 +471,16 @@ function ingest(line){
    그래서 물 위에 있는 동안은 앱이 1초마다 "물 위" 신호를 대신 넣어 기존 규칙(물속 시간·쉬는 시간·SOS)을 그대로 씀.
    맥박·온도는 없으므로 비워 둠(NaN). 부표 자체의 잠수 시간 경보는 기록·알림만 하고, 단계 판단은 앱 설정 기준으로 함 */
 const BUOY_ID=1, BUOY_GAP=2000;   // 부표는 신호가 2초 끊기면 입수로 알려 줌
-const buoy={on:false, up:false, sosUntil:0, alerted:false};
+const BUOY_BLIP=5;                 // 5초 안에 다시 잡히면 전파가 잠깐 튄 것 → 잠수 기록 안 함
+const buoy={on:false, up:false, sosUntil:0, alerted:false, last:null};
+const isBuoy=d=>buoy.on && d.id===BUOY_ID;
+// 물속으로 보는 기준: 부표는 이미 2초를 기다렸다 알려 주므로 알림 즉시, 보통 마이크로비트는 4초
+const gapOf=d=>isBuoy(d)?BUOY_GAP/1000-0.1:SURF_GAP;
 function buoyFeed(){ ingest(`D,${BUOY_ID},nan,nan,0,0,${now()<buoy.sosUntil?1:0}`); }
 function buoyEvent(line){
   const t=line.toUpperCase();
   if(!buoy.on){ buoy.on=true; log("부표 마이크로비트 신호를 받고 있어요 (입수·복귀를 알려 주는 방식, 해녀 1명)"); }
+  buoy.last={at:now(), what:t.includes("SUBMERGED")?"물에 들어감":t.includes("RETURNED")?"물 위로 올라옴":t.includes("SOS")?"SOS":t.includes("EXCEEDED")?"잠수 시간 초과":line.slice(0,30)};
   if(t.includes("SUBMERGED")){
     const d=diver(BUOY_ID);
     if(!d.lastAt) buoyFeed();                 // 처음 받은 신호면 카드부터 만들기
@@ -492,7 +499,7 @@ function buoyEvent(line){
 function evaluate(d){
   const T=S.t, r=[]; let lv=0; const up=(l,msg)=>{ lv=Math.max(lv,l); r.push(msg); };
   if(!d.last){ return {level:0,reasons:["신호 대기 중"]}; }
-  const lost=(now()-d.lastAt)/1000, under=lost>SURF_GAP, sec=Math.round(lost);
+  const lost=(now()-d.lastAt)/1000, under=lost>gapOf(d), sec=Math.round(lost);
   if(under){
     if(lost>=T.lostCrit) up(3,`물속 ${sec}초째 안 올라옴`);
     else if(lost>=T.lostDanger) up(2,`물속 ${sec}초째, 너무 길어요`);
@@ -521,7 +528,7 @@ const fmtSec=s=>s>=60?`${Math.floor(s/60)}분 ${s%60}초`:`${s}초`;
 // 상태 변화 추적: 물에 들어가는 순간 기록, 시간 띠용 기록
 function trackState(d){
   if(!d.lastAt) return;
-  const under=(now()-d.lastAt)/1000>SURF_GAP;
+  const under=(now()-d.lastAt)/1000>gapOf(d);
   if(under && !d.under){
     d.under=true; d.diveStart=d.lastAt;
     d.restBefore=Math.round((d.lastAt-(d.surfacedAt||d.lastAt))/1000);
@@ -554,7 +561,7 @@ function renderDivers(){
     : `<p class="note">아직 받은 신호가 없어요. 해녀용 마이크로비트를 켜거나 시뮬레이션을 켜세요.</p>`; return; }
   box.innerHTML=ids.map(id=>{
     const d=divers.get(id), k=d.last||{}, lost=d.lastAt?Math.round((now()-d.lastAt)/1000):0;
-    const under=d.lastAt && lost>SURF_GAP;
+    const under=d.lastAt && lost>gapOf(d);
     const bpm = under?"–":(k.bpm>0?k.bpm:(k.bpm===0?"--":"없음"));
     const last=d.dives[d.dives.length-1], maxDive=d.dives.reduce((m,x)=>Math.max(m,x.len),0);
     return `<article class="diver" data-lv="${d.level}">
@@ -581,6 +588,7 @@ $("divers").addEventListener("click",e=>{ const b=e.target.closest("[data-report
 function tick(){
   if(sim.on) simStep();
   if(port && buoy.on && buoy.up) buoyFeed();   // 부표: 물 위에 있는 동안 "물 위" 신호를 대신 넣음
+  if(port && buoy.last) $("connText").textContent=`부표 연결됨 · ${buoy.last.what} ${fmtSec(Math.round((now()-buoy.last.at)/1000))} 전`;
   for(const d of divers.values()){
     trackState(d);
     const {level,reasons}=evaluate(d); d.level=level; d.reasons=reasons;
