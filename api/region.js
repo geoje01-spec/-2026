@@ -40,6 +40,26 @@ module.exports = async (req, res) => {
   const key = process.env.DATA_GO_KEY;
   if (!key) return res.status(500).json({ error: "Vercel에 DATA_GO_KEY 환경변수가 없어요" });
   const raw = !!req.query.raw;
+  // 진단: 여러 조건 조합을 한 번에 시험 (/api/region?probe=1)
+  if (req.query.probe) {
+    const base = "https://apis.data.go.kr/B552845/perRegion/price";
+    const today = new Date(Date.now() + 9 * 3600e3), ymd = (d) => d.toISOString().slice(0, 10).replace(/-/g, "");
+    const t = ymd(today), m1 = ymd(new Date(today - 30 * 864e5)), dash = (x) => `${x.slice(0, 4)}-${x.slice(4, 6)}-${x.slice(6)}`;
+    const tries = {
+      "농산물 예시(쌀 100/111, 30일)": { "cond[exmn_ymd::GTE]": m1, "cond[exmn_ymd::LTE]": t, "cond[ctgry_cd::EQ]": "100", "cond[item_cd::EQ]": "111" },
+      "수산물 전복 653 (30일)": { "cond[exmn_ymd::GTE]": m1, "cond[exmn_ymd::LTE]": t, "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": "653" },
+      "수산물 고등어 611 (30일)": { "cond[exmn_ymd::GTE]": m1, "cond[exmn_ymd::LTE]": t, "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": "611" },
+      "수산물 부류만 (30일)": { "cond[exmn_ymd::GTE]": m1, "cond[exmn_ymd::LTE]": t, "cond[ctgry_cd::EQ]": "600" },
+      "날짜 하이픈 형식 (고등어)": { "cond[exmn_ymd::GTE]": dash(m1), "cond[exmn_ymd::LTE]": dash(t), "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": "611" },
+      "조건 없음": {},
+    };
+    const out = {};
+    await Promise.all(Object.entries(tries).map(async ([name, prm]) => {
+      try { const r = await get(base, key, prm); out[name] = { status: r.status, 건수: r.items.length, 예시: r.items[0] || r.text.slice(0, 160) }; }
+      catch (e) { out[name] = { 오류: e.message }; }
+    }));
+    return res.status(200).json(out);
+  }
   if (!raw && cache.data && Date.now() - cache.at < 12 * 3600 * 1000) return res.status(200).json(cache.data);
   const log = [];
   try {
