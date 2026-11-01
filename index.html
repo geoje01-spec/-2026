@@ -441,7 +441,7 @@ const nameOf = id => S.names[id] || `해녀 ${id}`;
 // 부표 마이크로비트(buoy_receiver_python.py)는 위 형식 대신 사건만 알림: "EVENT: DIVER SUBMERGED" 등 → buoyEvent
 function ingest(line){
   line=line.trim();
-  if(/^(EVENT|ALERT):/i.test(line)){ buoyEvent(line); return; }
+  if(/^(EVENT|ALERT|INFO):/i.test(line)){ buoyEvent(line); return; }
   if(line.startsWith("A,")){ const id=parseInt(line.split(",")[1]); if(id>0) onAck(id); return; }
   // "D," 없이 해녀용 형식(번호,온도,맥박,쓰러짐,무움직임초,SOS)만 온 줄도 받아 줌
   if(/^\d+(,-?[\d.]+){5,6}$/.test(line)) line="D,"+line;
@@ -471,9 +471,9 @@ function ingest(line){
 /* 부표 마이크로비트: 해녀 한 명(1번)의 입수·복귀·SOS만 알려 주고, 물 위에 있는 동안은 조용함.
    그래서 물 위에 있는 동안은 앱이 1초마다 "물 위" 신호를 대신 넣어 기존 규칙(물속 시간·쉬는 시간·SOS)을 그대로 씀.
    맥박·온도는 없으므로 비워 둠(NaN). 부표 자체의 잠수 시간 경보는 기록·알림만 하고, 단계 판단은 앱 설정 기준으로 함 */
-const BUOY_ID=1, BUOY_GAP=2000;   // 부표는 신호가 2초 끊기면 입수로 알려 줌
+const BUOY_ID=1, BUOY_GAP=3000;   // 부표는 신호가 3초 끊기면 입수로 알려 줌
 const BUOY_BLIP=5;                 // 5초 안에 다시 잡히면 전파가 잠깐 튄 것 → 잠수 기록 안 함
-const buoy={on:false, up:false, sosUntil:0, alerted:false, last:null};
+const buoy={on:false, up:false, sosUntil:0, alerted:false, last:null, info:null};
 const isBuoy=d=>buoy.on && d.id===BUOY_ID;
 // 물속으로 보는 기준: 부표는 이미 2초를 기다렸다 알려 주므로 알림 즉시, 보통 마이크로비트는 4초
 const gapOf=d=>isBuoy(d)?BUOY_GAP/1000-0.1:SURF_GAP;
@@ -481,6 +481,17 @@ function buoyFeed(){ ingest(`D,${BUOY_ID},nan,nan,0,0,${now()<buoy.sosUntil?1:0}
 function buoyEvent(line){
   const t=line.toUpperCase();
   if(!buoy.on){ buoy.on=true; log("부표 마이크로비트 신호를 받고 있어요 (입수·복귀를 알려 주는 방식, 해녀 1명)"); }
+  // 진단 줄 "INFO: RX 받은수 RSSI 세기 GAP 가장긴끊김ms" (5초마다)
+  const m=t.match(/^INFO:\s*RX\s+(-?\d+)\s+RSSI\s+(-?\d+)\s+GAP\s+(-?\d+)/);
+  if(t.startsWith("INFO:")){
+    if(!m) return;
+    buoy.info={rx:+m[1], rssi:+m[2], gap:+m[3], at:now()};
+    // 처음 연결했을 때 해녀가 물 위에 있으면(신호가 옴) 입수를 기다리지 않고 바로 카드를 만듦
+    if(buoy.info.rx>0 && !buoy.last && !diver(BUOY_ID).lastAt){ buoy.up=true; buoyFeed(); }
+    if(buoy.info.rx>0 && buoy.info.gap>=1500 && buoy.info.gap<=BUOY_GAP)
+      log(`부표 진단: 신호가 ${(buoy.info.gap/1000).toFixed(1)}초 끊겼다 다시 잡힘 (세기 ${buoy.info.rssi}, 5초에 ${buoy.info.rx}번 받음)`);
+    return;
+  }
   buoy.last={at:now(), what:t.includes("SUBMERGED")?"물에 들어감":t.includes("RETURNED")?"물 위로 올라옴":t.includes("SOS")?"SOS":t.includes("EXCEEDED")?"잠수 시간 초과":line.slice(0,30)};
   if(t.includes("SUBMERGED")){
     const d=diver(BUOY_ID);
@@ -590,7 +601,10 @@ function tick(){
   if(sim.on) simStep();
   if(port && buoy.on && buoy.up) buoyFeed();   // 부표: 물 위에 있는 동안 "물 위" 신호를 대신 넣음
   connInfo();
-  if(port && buoy.last) $("connText").textContent=`부표 연결됨 · ${buoy.last.what} ${fmtSec(Math.round((now()-buoy.last.at)/1000))} 전`;
+  if(port && (buoy.last||buoy.info)){
+    const i=buoy.info, sig=i?` · 5초에 신호 ${i.rx}번${i.rx?` · 세기 ${i.rssi}`:""}`:"";
+    $("connText").textContent=`부표 연결됨${buoy.last?` · ${buoy.last.what} ${fmtSec(Math.round((now()-buoy.last.at)/1000))} 전`:""}${sig}`;
+  }
   for(const d of divers.values()){
     trackState(d);
     const {level,reasons}=evaluate(d); d.level=level; d.reasons=reasons;
@@ -792,7 +806,7 @@ function serialOdd(line){
   if(rx.odd===5) log("알아보지 못한 줄이 계속 와요. 수신용 마이크로비트에 receiver_makecode.ts를 넣었는지 확인해 주세요.");
 }
 function connInfo(){
-  if(!port || buoy.last) return;
+  if(!port || buoy.last || buoy.info) return;
   const s=Math.round((now()-(rx.at||rx.since))/1000);
   $("connText").textContent = rx.n
     ? `마이크로비트 연결됨 · 받은 줄 ${rx.n}개 · 마지막 ${s}초 전 "${rx.last.slice(0,24)}"`
@@ -810,7 +824,7 @@ $("btnSerial").onclick=async()=>{
   try{
     port=await navigator.serial.requestPort();
     await port.open({baudRate:115200});
-    sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now()});
+    sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false,last:null,info:null}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now()});
     setConn(); log("수신용 마이크로비트 연결됨"); readLoop();
   }catch(e){ port=null; setConn(); toast("연결하지 못했어요: "+(e.message||e)); }
 };
