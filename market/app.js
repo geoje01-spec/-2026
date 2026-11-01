@@ -20,10 +20,15 @@
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 안 되는 환경이면 메모리만 씀 */ } }
   };
 
+  /* ---------- 로그인: 해녀 계정은 해녀 화면, 일반 계정은 손님 화면 ---------- */
+  const SESSION = store.get('haenyeo_session', null);
+  if (!SESSION || !SESSION.username) { location.replace('/market/login.html'); return; }
+  const IS_HAENYEO = SESSION.userType === 'haenyeo';
+
   /* ---------- 데이터: 공유 게시판(서버) 또는 이 기기 ---------- */
   let CONFIG = { gemini: false, shared: false };
   let S = null;
-  const DEV = store.get('hb-dev', null) || (() => { const id = A.uid('d'); store.set('hb-dev', id); return id; })();
+  const DEV = 'u:' + SESSION.username;   // 내 글·내 예약·내 후기를 가리는 주인 표시 (계정별)
 
   async function fetchShared() {
     const r = await fetch('/api/board', { cache: 'no-store' });
@@ -71,13 +76,17 @@
   }
 
   /* ---------- 화면 상태 ---------- */
+  // 해녀 내 정보는 계정마다 따로. 시연용 해녀는 예시 정보로 바로 올릴 수 있게, 새 해녀는 이름만 채워 둠
+  const ME_KEY = 'hb2-me:' + SESSION.username;
+  const firstMe = () => SESSION.demo ? Object.assign({}, A.EXAMPLE_ME)
+    : { name: SESSION.name || '', village: '', region: 'jeju', phone: '', place: '', hours: '' };
   const ui = {
-    role: store.get('hb2-role', 'c'),
+    role: IS_HAENYEO ? 'h' : 'c',
     tab: { h: 'upload', c: 'market' },
     draft: { status: 'idle' },
     lastPost: null,
     filter: 'all',
-    me: store.get('hb2-me', null) || Object.assign({}, A.EXAMPLE_ME),
+    me: store.get(ME_KEY, null) || firstMe(),
     delArm: null,
     newProg: false,
     rv: Object.assign({ name: '', phone: '', text: '' }, store.get('hb2-guest', null) || {}),
@@ -85,6 +94,7 @@
     pinFor: null, pin: { code: '', phone: '', until: '오늘 저녁 8시까지' },         // 비밀번호 보내는 중
     focusLocker: null
   };
+  if (!ui.rv.name && !SESSION.demo) ui.rv.name = SESSION.name || '';
   ui.rev.name = ui.rv.name || '';
 
   // 지역: 해녀는 내 정보의 지역, 손님은 고른 지역(또는 내 위치)
@@ -301,7 +311,7 @@
       </section>`;
     }
     if (d.status === 'idle') {
-      html += `<div class="stack"><div class="eyebrow">${esc(ui.me.village)} · ${esc(ui.me.name)} 해녀</div>
+      html += `<div class="stack"><div class="eyebrow">${[ui.me.village, ui.me.name + ' 해녀'].filter(Boolean).map(esc).join(' · ')}</div>
         <h1>오늘 잡은 해산물을<br>찍어서 알리세요</h1>
         <p class="muted" style="margin:0">사진 한 장이면 AI가 품목을 알아보고 홍보 글을 써 드려요. 손님이 보고 해녀님께 직접 전화해요. 수수료는 없어요.</p></div>
         <label class="shoot" for="cam">
@@ -540,8 +550,7 @@
   function render() {
     if (!S) return;
     document.body.classList.toggle('haenyeo', ui.role === 'h');
-    $('#role-h').setAttribute('aria-pressed', ui.role === 'h');
-    $('#role-c').setAttribute('aria-pressed', ui.role === 'c');
+    $('#account').innerHTML = `<span class="who"><b>${esc(String(SESSION.name || SESSION.username).replace('(예시)', ''))}${IS_HAENYEO ? ' 삼촌' : ' 님'}</b><span>${IS_HAENYEO ? '해녀' : '손님'}${SESSION.demo ? ' · 시연' : ''}</span></span><button type="button" class="btn" data-act="logout">로그아웃</button>`;
     $('#mode').innerHTML = `<span><i class="dot ${CONFIG.gemini ? 'on' : ''}"></i>사진 판별 ${CONFIG.gemini ? 'Gemini' : '데모'}</span><span><i class="dot ${CONFIG.priceN ? 'on' : ''}"></i>시세 ${CONFIG.priceN ? 'aT ' + CONFIG.priceN + '품목' : '기본 참고가'}</span>${CONFIG.regionN ? `<span><i class="dot on"></i>지역 물가 ${CONFIG.regionN}곳</span>` : ''}<span><i class="dot ${CONFIG.shared ? 'on' : ''}"></i>${CONFIG.shared ? '모든 손님에게 공유' : '이 기기에만 저장'}</span>`;
     const tabs = TABS[ui.role];
     const cur = tabs.find((t) => t.id === ui.tab[ui.role]) || (HIDDEN[ui.role] || []).find((t) => t.id === ui.tab[ui.role]) || tabs[0];
@@ -674,7 +683,7 @@
     const b = e.target.closest('[data-act]'); if (!b) return;
     const act = b.dataset.act, v = b.dataset.v, d = ui.draft;
     switch (act) {
-      case 'role': break;
+      case 'logout': try { localStorage.removeItem('haenyeo_session'); } catch { /* 저장 안 되는 환경 */ } location.replace('/market/login.html'); break;
       case 'tab': ui.tab[ui.role] = v; ui.delArm = null; render(); window.scrollTo(0, 0); break;
       case 'filter': ui.filter = v; render(); break;
       case 'copy': copy(v, '전화번호를 복사했어요.'); break;
@@ -719,7 +728,7 @@
       case 'me-save': {
         const m = { name: $('#me-name').value.trim(), village: $('#me-village').value.trim(), region: $('#me-region').value, phone: $('#me-phone').value.trim(), place: $('#me-place').value.trim(), hours: $('#me-hours').value.trim() };
         if (!m.name || !digits(m.phone)) { toast('이름과 전화번호는 꼭 적어 주세요.'); break; }
-        ui.me = m; store.set('hb2-me', m); toast('저장했어요. 다음에 올리는 글부터 이 정보가 보여요.');
+        ui.me = m; store.set(ME_KEY, m); toast('저장했어요. 다음에 올리는 글부터 이 정보가 보여요.');
         ui.tab.h = ui.draft.status === 'ready' ? 'upload' : 'me'; render();
         break;
       }
@@ -829,9 +838,6 @@
       }
     }
   });
-  document.querySelectorAll('.roles button').forEach((btn) => btn.addEventListener('click', () => {
-    ui.role = btn.dataset.role; store.set('hb2-role', ui.role); ui.delArm = null; render(); window.scrollTo(0, 0);
-  }));
 
   // 공유 게시판이면 다른 해녀가 올린 글을 30초마다 받아옴 (입력 중이면 건너뜀)
   setInterval(() => {

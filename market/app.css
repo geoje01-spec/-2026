@@ -206,10 +206,10 @@ body.haenyeo .btn.sm { min-height: 46px; }
 
 /* 폼: 밑줄 위주의 종이 입력칸 */
 label.field { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 15px; }
-input[type="text"], input[type="number"], input[type="date"], select {
+input[type="text"], input[type="password"], input[type="number"], input[type="date"], select {
   min-height: 50px; border: 1px solid var(--rule); border-bottom: 2px solid var(--ink); border-radius: var(--r) var(--r) 0 0; padding: 8px 12px; background: var(--paper); color: var(--ink); width: 100%;
 }
-input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, select:focus, textarea:focus { outline: none; border-color: var(--tewak); background: var(--paper-2); }
+input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus, input[type="date"]:focus, select:focus, textarea:focus { outline: none; border-color: var(--tewak); background: var(--paper-2); }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 400px) { .grid2 { grid-template-columns: 1fr; } }
 
@@ -318,3 +318,36 @@ textarea { min-height: 110px; border: 1px solid var(--rule); border-bottom: 2px 
 .banner.mod { background: var(--warn-bg); color: var(--ink); font-weight: 400; }
 .banner.mod b { color: var(--warn); }
 .suggest { margin: 8px 0; padding: 8px 10px; background: var(--paper-2); border-left: 3px solid var(--ok); font-family: var(--serif); }
+
+/* 로그인·회원가입 */
+.auth-page::after { bottom: 0; }
+main.auth { max-width: 440px; padding-block: 28px 90px; gap: 20px; }
+.auth-brand { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-weight: 800; font-size: 26px; letter-spacing: -0.02em; line-height: 1; padding-bottom: 14px; border-bottom: 1px solid var(--ink); box-shadow: 0 3px 0 -2px var(--ink); }
+.auth-brand .logo { width: 36px; height: 36px; flex: none; color: var(--ink); }
+.auth-brand small { display: block; font-family: var(--latin); font-style: italic; font-weight: 600; font-size: 14px; color: var(--sea); margin-top: 4px; letter-spacing: .04em; }
+.auth h1 { font-size: 38px; }
+.auth h1 em { font-style: normal; color: var(--tewak); }
+.field-error { margin: -8px 0 0; color: #b3261e; font-size: 13.5px; font-weight: 700; }
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { padding-right: 64px; }
+.pw-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--sea); font-weight: 700; font-size: 14px; padding: 8px; cursor: pointer; }
+.type-pick { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.type-pick legend { font-weight: 700; font-size: 15px; margin-bottom: 6px; padding: 0; }
+.type-card { position: relative; display: flex; flex-direction: column; gap: 4px; padding: 14px; border: 1.5px solid var(--rule); border-radius: var(--r); background: var(--paper); cursor: pointer; }
+.type-card input { position: absolute; opacity: 0; pointer-events: none; }
+.type-card b { font-family: var(--serif); font-weight: 800; font-size: 22px; }
+.type-card span { font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+.type-card:has(input:checked) { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.type-card:has(input:checked) span { color: var(--paper); opacity: .8; }
+.type-card:has(input:focus-visible) { outline: 2px solid var(--tewak); outline-offset: 3px; }
+.auth-alt { margin: 0; text-align: center; }
+.auth-alt a { color: var(--tewak); font-weight: 700; }
+.auth-demo { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.auth-demo .row .btn { flex: 1; }
+
+/* 상단 내 계정 (해녀/손님 표시 + 로그아웃) */
+.account { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.account .who { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; font-size: 14px; }
+.account .who b { font-weight: 800; }
+.account .who span { font-size: 11.5px; font-weight: 700; color: var(--sea); letter-spacing: .08em; }
+.account .btn { min-height: 36px; padding: 4px 12px; font-size: 13.5px; }
