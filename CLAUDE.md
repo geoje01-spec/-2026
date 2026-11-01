@@ -22,8 +22,8 @@
 | `index.html` | 숨비 지킴이 전체 (HTML·CSS·JS 한 파일, 약 1,400줄) |
 | `market/index.html`, `app.js`, `app.css`, `agents.js` | 해녀바당. `agents.js`는 품목·시세·지역·홍보 글·예약 인식 로직, `app.js`는 화면 |
 | `api/*.js` | Vercel 서버 함수 (Node, CommonJS). API 키를 숨기고 외부 API를 대신 호출 |
-| `haenyeo_sender_makecode.ts` | 해녀용 마이크로비트 (MakeCode JavaScript) |
-| `receiver_makecode.ts` | 수신용 마이크로비트 (PC에 USB로 연결) |
+| `haenyeo_sender_python.py` | 기본 방식 해녀용 마이크로비트 (MakeCode Python, 그룹 77). 2026-11-01 JavaScript에서 옮김 |
+| `receiver_python.py` | 기본 방식 수신용 마이크로비트 (MakeCode Python, PC에 USB로 연결). 그림은 따로 도는 반복에서 보여 줌(신호 놓침 방지) |
 | `buoy_receiver_python.py` | 부표(태왁) 마이크로비트, MakeCode Python. 라디오 그룹 1, 해녀 1명의 입수·복귀·SOS를 사건 줄로 알림 |
 | `buoy_sender_python.py` | 부표 방식의 해녀용 마이크로비트, MakeCode Python. 물 위 상태 동안 0.3초마다 1을 계속 보냄. 시연용 버튼: A 물 위(보냄)·B 물속(멈춤)·A+B SOS 99를 5초. 사용자 원본은 버튼을 누를 때만 보내서 부표가 3초 뒤 입수로 봤음(저장소에 없어 새로 만듦) |
 | `server.py` | Vercel 없이 PC에서 돌릴 때 쓰는 파이썬 서버 (키는 환경변수) |

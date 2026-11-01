@@ -6,7 +6,7 @@
 
 ## 숨비 지킴이 (`/`)
 마이크로비트로 해녀의 물질 상태(물속·물 위)를 관제하고, 위급하면 확인 절차 후 모의 신고. 실측 수온·기상청 해상예보로 오늘 물질 판단. 스스로 살피고 행동하는 AI 에이전트.
-- 마이크로비트: 기본 방식(`haenyeo_sender_makecode.ts`, `receiver_makecode.ts`) 또는 부표 방식(`buoy_receiver_python.py`)
+- 마이크로비트: 기본 방식(`haenyeo_sender_python.py`, `receiver_python.py`) 또는 부표 방식(`buoy_receiver_python.py`)
 
 ## 해녀바당 (`/market/`)
 해녀가 사진 한 장으로 해산물·체험을 알리고, 손님이 **익명 채팅**으로 주문해 **무인 냉장고**에서 비밀번호로 받아 가는 게시판. 이름·전화번호는 저장하지 않고 서로 별명으로만 보임. 주문·결제·배송 기능 없음, 수수료 없음.

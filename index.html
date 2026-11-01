@@ -808,7 +808,7 @@ function serialOdd(line){
   if(!port || !line) return;
   rx.odd++;
   if(rx.odd<=5) log(`알아보지 못한 줄: "${line.slice(0,40)}" (숨비 형식은 D,번호,온도,… 로 시작해야 해요)`);
-  if(rx.odd===5) log("알아보지 못한 줄이 계속 와요. 수신용 마이크로비트에 receiver_makecode.ts를 넣었는지 확인해 주세요.");
+  if(rx.odd===5) log("알아보지 못한 줄이 계속 와요. 수신용 마이크로비트에 receiver_python.py를 넣었는지 확인해 주세요.");
 }
 function connInfo(){
   if(!port || buoy.last || buoy.info) return;
