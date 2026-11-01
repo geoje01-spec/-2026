@@ -53,9 +53,16 @@ module.exports = async (req, res) => {
       "날짜 하이픈 형식 (고등어)": { "cond[exmn_ymd::GTE]": dash(m1), "cond[exmn_ymd::LTE]": dash(t), "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": "611" },
       "조건 없음": {},
     };
+    const fish = { "cond[exmn_ymd::GTE]": m1, "cond[exmn_ymd::LTE]": t, "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": "611" };
+    const jobs = Object.entries(tries).map(([name, prm]) => [name, base, prm]);
+    // perRegion의 다른 기능 이름
+    for (const op of ["", "/prices", "/list", "/info"]) jobs.push([`perRegion${op || "(기능 없음)"} 고등어`, "https://apis.data.go.kr/B552845/perRegion" + op, fish]);
+    // 같은 기관의 일별 도·소매 가격(perDay): 지역 이름(시군구)도 함께 줌
+    jobs.push(["perDay/price 고등어 (30일)", "https://apis.data.go.kr/B552845/perDay/price", fish]);
+    jobs.push(["perDay/price 쌀 예시 (30일)", "https://apis.data.go.kr/B552845/perDay/price", { "cond[exmn_ymd::GTE]": m1, "cond[exmn_ymd::LTE]": t, "cond[ctgry_cd::EQ]": "100", "cond[item_cd::EQ]": "111" }]);
     const out = {};
-    await Promise.all(Object.entries(tries).map(async ([name, prm]) => {
-      try { const r = await get(base, key, prm); out[name] = { status: r.status, 건수: r.items.length, 예시: r.items[0] || r.text.slice(0, 160) }; }
+    await Promise.all(jobs.map(async ([name, url, prm]) => {
+      try { const r = await get(url, key, prm); out[name] = { status: r.status, 건수: r.items.length, 예시: r.items[0] || r.text.slice(0, 200) }; }
       catch (e) { out[name] = { 오류: e.message }; }
     }));
     return res.status(200).json(out);
