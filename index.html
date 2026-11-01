@@ -21,25 +21,35 @@ body{margin:0}
   --display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
   --body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --ocean-top:#dff2f2; --ocean-mid:#bfe2e8; --ocean-deep:#93c8d5; --ocean-glow:rgba(255,255,255,.8); --ocean-ray:rgba(255,255,255,.16); --wave-front:rgba(255,255,255,.6); --wave-back:rgba(14,59,67,.14);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0A181B; --surface:#112428; --sunk:#0C1D20; --ink:#E2ECEB; --muted:#8EA4A6; --line:#22393D;
   --sea:#06262C; --sea-ink:#D6E7E4; --taewak:#FF7B3A;
   --ok:#4CC38A; --warn:#E2B53B; --danger:#FF6A5F; --crit:#FF4D4D;
-  --ok-bg:#12332A; --warn-bg:#382D0E; --danger-bg:#3D1A18; --crit-bg:#541414; color-scheme:dark}}
+  --ok-bg:#12332A; --warn-bg:#382D0E; --danger-bg:#3D1A18; --crit-bg:#541414; --ocean-top:#123a44; --ocean-mid:#0b2530; --ocean-deep:#04121a; --ocean-glow:rgba(124,195,211,.18); --ocean-ray:rgba(124,195,211,.05); --wave-front:rgba(124,195,211,.12); --wave-back:rgba(124,195,211,.07); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0A181B; --surface:#112428; --sunk:#0C1D20; --ink:#E2ECEB; --muted:#8EA4A6; --line:#22393D;
   --sea:#06262C; --sea-ink:#D6E7E4; --taewak:#FF7B3A;
   --ok:#4CC38A; --warn:#E2B53B; --danger:#FF6A5F; --crit:#FF4D4D;
-  --ok-bg:#12332A; --warn-bg:#382D0E; --danger-bg:#3D1A18; --crit-bg:#541414; color-scheme:dark}
+  --ok-bg:#12332A; --warn-bg:#382D0E; --danger-bg:#3D1A18; --crit-bg:#541414; --ocean-top:#123a44; --ocean-mid:#0b2530; --ocean-deep:#04121a; --ocean-glow:rgba(124,195,211,.18); --ocean-ray:rgba(124,195,211,.05); --wave-front:rgba(124,195,211,.12); --wave-back:rgba(124,195,211,.07); color-scheme:dark}
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+body{color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+/* 바다 배경: 위는 햇빛 드는 얕은 물, 아래로 갈수록 깊은 바다. 바닥에 천천히 흐르는 물결 두 겹 */
+body{background-color:var(--ocean-deep);background-image:radial-gradient(120% 55% at 50% -12%,var(--ocean-glow),transparent 62%),repeating-linear-gradient(105deg,transparent 0 90px,var(--ocean-ray) 90px 150px,transparent 150px 260px),linear-gradient(180deg,var(--ocean-top) 0%,var(--ocean-mid) 45%,var(--ocean-deep) 100%);background-attachment:fixed;min-height:100vh}
+html::after,body::after{content:"";position:fixed;left:0;right:0;bottom:0;pointer-events:none;z-index:0;-webkit-mask-repeat:repeat-x;mask-repeat:repeat-x}
+html::after{height:150px;background:var(--wave-back);-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 100' preserveAspectRatio='none'%3E%3Cpath d='M0 30 C110 60 210 60 320 30 S530 0 640 30 V100 H0Z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 100' preserveAspectRatio='none'%3E%3Cpath d='M0 30 C110 60 210 60 320 30 S530 0 640 30 V100 H0Z'/%3E%3C/svg%3E");-webkit-mask-size:640px 100%;mask-size:640px 100%;animation:drift-back 34s linear infinite}
+body::after{height:110px;background:var(--wave-front);-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 100' preserveAspectRatio='none'%3E%3Cpath d='M0 46 C150 16 300 16 450 46 S750 76 900 46 V100 H0Z'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 100' preserveAspectRatio='none'%3E%3Cpath d='M0 46 C150 16 300 16 450 46 S750 76 900 46 V100 H0Z'/%3E%3C/svg%3E");-webkit-mask-size:900px 100%;mask-size:900px 100%;animation:drift-front 22s linear infinite}
+@keyframes drift-front{to{-webkit-mask-position:900px 0;mask-position:900px 0}}
+@keyframes drift-back{to{-webkit-mask-position:-640px 0;mask-position:-640px 0}}
+@media (prefers-reduced-motion:reduce){html::after,body::after{animation:none}}
+
 button,input,select,textarea{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--taewak);outline-offset:2px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
-header.top{background:var(--sea);color:var(--sea-ink);padding-block:14px;
+header.top{position:relative;z-index:1;background:var(--sea);color:var(--sea-ink);padding-block:14px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .top-in{max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
 .brand{display:flex;align-items:baseline;gap:10px}
@@ -60,7 +70,7 @@ header.top{background:var(--sea);color:var(--sea-ink);padding-block:14px;
 .btn.small{padding:4px 10px;font-size:13px}
 .btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
 
-main{max-width:1280px;margin:0 auto;padding-block:20px 40px;
+main{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding-block:20px 120px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
   display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:920px){main{grid-template-columns:minmax(0,1fr)}}
