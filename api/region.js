@@ -48,10 +48,13 @@ module.exports = async (req, res) => {
     const codes = [...new Set(rec.items.map((it) => pick(it, /^item_cd$/i)).filter(Boolean))].slice(0, 10);
     const day = String(pick(rec.items[0] || {}, /exmn_ymd/i) || "").replace(/-/g, "");
     log.push({ 단계: "최근 시세", status: rec.status, 품목코드: codes, 조사일: day });
-    if (!codes.length || !day) return res.status(502).json({ error: "최근 시세에서 품목 코드를 얻지 못했어요", log });
+    if (!codes.length || !/^\d{8}$/.test(day)) return res.status(502).json({ error: "최근 시세에서 품목 코드를 얻지 못했어요", log });
     // 2) 지역별 가격: 기능 이름 찾기
     const base0 = "https://apis.data.go.kr/B552845/perRegion";
-    const params = (c) => ({ "cond[exmn_ymd::GTE]": day, "cond[exmn_ymd::LTE]": day, "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": c });
+    // 지역별 가격은 매일 모든 지역이 올라오지 않아서 최근 30일을 받아 지역마다 가장 최근 값을 씀
+    const d0 = new Date(Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8)) - 30 * 864e5);
+    const from = d0.toISOString().slice(0, 10).replace(/-/g, "");
+    const params = (c) => ({ "cond[exmn_ymd::GTE]": from, "cond[exmn_ymd::LTE]": day, "cond[ctgry_cd::EQ]": "600", "cond[item_cd::EQ]": c });
     if (OP === null) {
       for (const op of OPS) {
         const t = await get(base0 + op, key, params(codes[0]));
@@ -68,17 +71,26 @@ module.exports = async (req, res) => {
       if (!r.items.length) { if (log.length < 8) log.push({ 품목코드: r.c, status: r.status, 응답: r.text.slice(0, 200) }); continue; }
       sample = sample || r.items.slice(0, 3);
       // 소매 위주로, 같은 단위끼리 비교
-      const list = r.items.map((it) => ({ se: String(pick(it, /se_nm/i) || ""), sgg: pick(it, /sgg_nm/i) || pick(it, /mrkt_nm/i), unit: pick(it, /^unit$/i), p: price(it) })).filter((x) => x.p && x.sgg);
+      const all = r.items.map((it) => ({ se: String(pick(it, /se_nm/i) || ""), sgg: pick(it, /sgg_nm/i) || pick(it, /mrkt_nm/i), unit: pick(it, /^unit$/i), vr: pick(it, /vrty_cd/i), gr: pick(it, /grd_cd/i), ymd: String(pick(it, /exmn_ymd/i) || ""), p: price(it) })).filter((x) => x.p && x.sgg);
+      // 같은 지역·구분·품종·등급·단위는 가장 최근 조사일 값 하나만
+      const latest = {};
+      for (const x of all) { const k = [x.sgg, x.se, x.vr, x.gr, x.unit].join("|"); if (!latest[k] || x.ymd > latest[k].ymd) latest[k] = x; }
+      const list = Object.values(latest);
       const retail = list.filter((x) => /소매/.test(x.se));
       const use = retail.length >= 3 ? retail : list;
-      const nat = median(use.map((x) => x.p));
-      if (!nat) continue;
-      rows += use.length;
-      for (const x of use) { const g = regionOf(x.sgg); if (g) (ratios[g] = ratios[g] || []).push(x.p / nat); }
+      // 같은 품종·등급·단위끼리 전국 중앙값과 비교
+      const groups = {};
+      for (const x of use) (groups[[x.se, x.vr, x.gr, x.unit].join("|")] = groups[[x.se, x.vr, x.gr, x.unit].join("|")] || []).push(x);
+      for (const g of Object.values(groups)) {
+        if (g.length < 3) continue;
+        const nat = median(g.map((x) => x.p));
+        rows += g.length;
+        for (const x of g) { const k = regionOf(x.sgg); if (k) (ratios[k] = ratios[k] || []).push(x.p / nat); }
+      }
     }
     const factors = {};
     for (const [g, a] of Object.entries(ratios)) factors[g] = Math.round(median(a) * 100) / 100;
-    const data = { ok: Object.keys(factors).length > 0, date: day, factors, rows, op: OP, how: "지역 수산물 소매가 ÷ 전국 중앙값 (품목별 비율의 중앙값)" };
+    const data = { ok: Object.keys(factors).length > 0, date: day, from, factors, rows, op: OP, how: "지역 수산물 소매가 ÷ 전국 중앙값 (품목별 비율의 중앙값)" };
     if (raw) return res.status(200).json({ ...data, 원본_예시: sample, log });
     if (!data.ok) return res.status(502).json({ error: "지역별 가격 자료가 없어요", log });
     cache = { at: Date.now(), data };
