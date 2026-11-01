@@ -14,7 +14,6 @@
     return h < 24 ? h + '시간 전' : Math.round(h / 24) + '일 전';
   };
   const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1); return (c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28) ? a : b; };
-  const digits = (p) => String(p || '').replace(/[^\d+]/g, '');
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
     set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 안 되는 환경이면 메모리만 씀 */ } }
@@ -50,13 +49,27 @@
       } catch (e) { toast(e.message + ' 이 기기에만 저장할게요.'); CONFIG.shared = false; }
     }
     S = store.get('hb2-state', null) || A.seed();
-    // 냉장고·후기가 생기기 전의 예시 글만 있으면 새 예시로 바꿈 (해녀가 올린 글이 있으면 그대로)
-    if (!Array.isArray(S.reviews) && S.posts.every((p) => p.example)) S = A.seed();
+    // 채팅이 생기기 전의 예시 글만 있으면 새 예시로 바꿈 (해녀가 올린 글이 있으면 그대로)
+    if (!Array.isArray(S.chats) && S.posts.every((p) => p.example)) S = A.seed();
+  }
+  // 익명: 예전 글에 남은 이름·전화번호·마을·만나는 곳은 지우고 별명만 남김
+  function anon(a, key) {
+    a = a || {};
+    if (!a.alias) a.alias = A.alias('haenyeo', key);
+    if (!a.region) a.region = A.regionOf(a.village) || 'jeju';
+    ['name', 'phone', 'village', 'place'].forEach((k) => delete a[k]);
+    return a;
   }
   function norm(s) {
     s.reviews = Array.isArray(s.reviews) ? s.reviews : [];
+    s.chats = Array.isArray(s.chats) ? s.chats : [];
+    s.posts.forEach((p) => { p.author = anon(p.author, p.ownerId || p.id); });
+    (s.programs || []).forEach((p) => { p.author = anon(p.author, p.ownerId || p.id); });
+    s.reviews.forEach((r) => { if (!r.alias) r.alias = A.alias('general', r.ownerId || r.id); delete r.name; });
     s.wants =(s.wants || []).filter((w) => Date.now() - new Date(w.createdAt) < A.WANT_DAYS * 864e5);
     s.wants.forEach((w) => {   // 예전 형식(해산물 하나만 고르던 예약) 맞추기
+      if (!w.alias) w.alias = A.alias('general', w.ownerId || w.id);
+      delete w.name; delete w.phone;
       if (!Array.isArray(w.species)) w.species = w.species ? [w.species] : [];
       if (!w.text) w.text = w.species.map((k) => SP[k] ? SP[k].ko : k).join(', ') + (w.memo ? ' · ' + w.memo : '');
     });
@@ -76,29 +89,31 @@
   }
 
   /* ---------- 화면 상태 ---------- */
-  // 해녀 내 정보는 계정마다 따로. 시연용 해녀는 예시 정보로 바로 올릴 수 있게, 새 해녀는 이름만 채워 둠
+  // 해녀 내 정보는 계정마다 따로 (지역·판매 시간만. 이름·전화번호는 받지 않음)
   const ME_KEY = 'hb2-me:' + SESSION.username;
-  const firstMe = () => SESSION.demo ? Object.assign({}, A.EXAMPLE_ME)
-    : { name: SESSION.name || '', village: '', region: 'jeju', phone: '', place: '', hours: '' };
+  const firstMe = () => Object.assign({}, SESSION.demo ? A.EXAMPLE_ME : { region: 'jeju', hours: '' });
+  // 손님과 해녀 모두 별명으로만 보임
+  const ME_ALIAS = A.alias(IS_HAENYEO ? 'haenyeo' : 'general', DEV);
   const ui = {
     role: IS_HAENYEO ? 'h' : 'c',
     tab: { h: 'upload', c: 'market' },
     draft: { status: 'idle' },
     lastPost: null,
     filter: 'all',
-    me: store.get(ME_KEY, null) || firstMe(),
+    me: anonMe(store.get(ME_KEY, null) || firstMe()),
     delArm: null,
     newProg: false,
-    rv: Object.assign({ name: '', phone: '', text: '' }, store.get('hb2-guest', null) || {}),
-    rev: { postId: null, stars: 5, text: '', name: '', busy: false, msg: null },   // 후기 쓰는 중
-    pinFor: null, pin: { code: '', phone: '', until: '오늘 저녁 8시까지' },         // 비밀번호 보내는 중
+    rv: { text: '' },                                                           // 먼저 보기 예약 쓰는 중
+    rev: { postId: null, stars: 5, text: '', busy: false, msg: null },         // 후기 쓰는 중
+    chat: { id: null, pending: null, draft: '', pinOpen: false, pin: { code: '', until: '오늘 저녁 8시까지' } },   // 채팅
     focusLocker: null
   };
-  if (!ui.rv.name && !SESSION.demo) ui.rv.name = SESSION.name || '';
-  ui.rev.name = ui.rv.name || '';
+  function anonMe(m) { ['name', 'phone', 'village', 'place'].forEach((k) => delete m[k]); return m; }
+  // 글·체험에 붙는 해녀 정보: 별명·지역·판매 시간만
+  const myAuthor = () => ({ alias: ME_ALIAS, region: myRegion(), hours: ui.me.hours || '' });
 
   // 지역: 해녀는 내 정보의 지역, 손님은 고른 지역(또는 내 위치)
-  const myRegion = () => ui.me.region || A.regionOf(ui.me.village) || 'jeju';
+  const myRegion = () => ui.me.region || 'jeju';
   const rp = (d) => Object.assign({ region: myRegion() }, d);
   ui.region = IS_HAENYEO ? myRegion() : (store.get('hb2-region', null) || 'jeju');   // 해녀는 내 지역 냉장고부터
   const regionName = (k) => (A.REGIONS[k] || {}).name || '';
@@ -126,6 +141,7 @@
     people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.8.3 5 2.6 5 5.8"/></svg>',
     shop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h16l-1.5 11h-13z"/><path d="M8 9a4 4 0 0 1 8 0"/></svg>',
     user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>',
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg>',
     map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>'
   };
   // 선으로 그린 물결 두 줄 (잡지 삽화 느낌)
@@ -134,27 +150,144 @@
   const coverArt = '<svg class="art" viewBox="0 0 340 46" preserveAspectRatio="xMaxYMid meet" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M0 30q14-9 28 0t28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0"/><path d="M14 41q14-9 28 0t28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0" opacity=".45"/></g><circle cx="292" cy="17" r="11" style="fill:var(--tewak)"/><path d="M281.6 15.2c6.9 2.4 13.9 2.4 20.8 0" stroke="#fbf8f2" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>';
 
   /* ---------- 공용 조각 ---------- */
-  const isExample = (a) => /예시/.test((a && a.name) || '');
-  // lk: 무인 냉장고로 받는 글이면 그 냉장고 (만나지 않고 비밀번호로 받음)
-  function contact(a, what, lk) {
-    const ph = digits(a.phone);
-    const sms = lk ? `해녀바당에서 보고 연락드려요. ${what} 주문할게요. ${lk.name} 냉장고로 받을게요.` : '해녀바당에서 보고 연락드려요. ' + what + ' 아직 있나요?';
+  // 손님이 해녀에게 연락하는 곳: 전화번호 대신 익명 채팅 (ref: 어떤 글·체험에 대한 채팅인지)
+  function chatBox(ref, title, seller, a, lk) {
+    if (seller === DEV) return '';   // 내 글엔 채팅 버튼 없음
+    const t = chatFind(ref, DEV);
     return `<div class="contact">
-      <div class="row between"><div><b>${esc(a.name)} 해녀</b> <span class="muted small">${esc(a.village)}</span></div>${isExample(a) ? '<span class="pill info">예시 연락처</span>' : ''}</div>
-      <div class="phone num">${esc(a.phone)}</div>
-      <div class="row">
-        <a class="btn primary sm" href="sms:${esc(ph)}?body=${encodeURIComponent(sms)}">${lk ? '문자로 주문' : '문자 보내기'}</a>
-        <a class="btn sm" href="tel:${esc(ph)}">전화 걸기</a>
-        <button type="button" class="btn sm" data-act="copy" data-v="${esc(a.phone)}">번호 복사</button>
-      </div>
-      ${lk ? `<p class="small" style="margin:0">🔒 주문하면 삼촌이 <b>${esc(lk.name)} 냉장고</b>에 넣고 잠근 뒤 <b>비밀번호를 문자로</b> 보내 드려요. 만나지 않아도 돼요.</p>` : ''}
-      <div class="kv">${lk ? `<span>받는 곳 <b>${esc(lk.name)} 냉장고</b></span>` : a.place ? `<span>만나는 곳 <b>${esc(a.place)}</b></span>` : ''}${a.hours ? `<span>판매 시간 <b>${esc(a.hours)}</b></span>` : ''}</div>
+      <div class="row between"><div><b>${esc(a.alias)}</b> <span class="muted small">${esc(regionName(a.region))} 해녀</span></div><span class="pill info">익명</span></div>
+      <button type="button" class="btn primary" data-act="chat-start" data-type="${ref.type}" data-id="${esc(ref.id)}">💬 ${t ? '채팅 이어 하기' : ref.type === 'post' ? '채팅으로 주문하기' : '채팅으로 물어보기'}</button>
+      <p class="small" style="margin:0">🔒 이름과 전화번호는 서로 보이지 않아요.${lk ? ` 채팅으로 주문하면 삼촌이 <b>${esc(lk.name)} 냉장고</b>에 넣고 <b>비밀번호를 채팅으로</b> 보내 드려요.` : ''}</p>
+      <div class="kv">${lk ? `<span>받는 곳 <b>${esc(lk.name)} 냉장고</b></span>` : ''}${a.hours ? `<span>판매 시간 <b>${esc(a.hours)}</b></span>` : ''}</div>
     </div>`;
   }
   function shareText(p) {
-    const sp = SP[p.species], a = p.author, lk = p.locker && A.locker(p.locker.id);
-    return `[해녀바당] ${p.promo}\n\n${A.label(p.species, p.variety)} ${p.grade}등급 ${kg(p.weightKg)}${p.askPerKg ? ` · kg당 ${won(p.askPerKg)}` : ''}\n연락: ${a.name} 해녀 ${a.phone}\n${lk ? `받는 곳: ${lk.name} 무인 냉장고 (${lk.place}) · 비밀번호는 주문하면 문자로` : (a.place ? '만나는 곳: ' + a.place : '') + (a.hours ? ` (${a.hours})` : '')}\n${location.origin}/market/`;
+    const lk = p.locker && A.locker(p.locker.id);
+    return `[해녀바당] ${p.promo}\n\n${A.label(p.species, p.variety)} ${p.grade}등급 ${kg(p.weightKg)}${p.askPerKg ? ` · kg당 ${won(p.askPerKg)}` : ''}\n주문: 해녀바당에서 ${p.author.alias}에게 채팅 (이름·전화번호 없이)\n${lk ? `받는 곳: ${lk.name} 무인 냉장고 (${lk.place}) · 비밀번호는 채팅으로` : ''}\n${location.origin}/market/`;
   }
+
+  /* ---------- 익명 채팅 ---------- */
+  // 채팅 하나 = 해녀(seller) 한 명 ↔ 손님(buyer) 한 명, 어떤 글·체험·예약에 대한 것인지(ref)
+  // 공유 게시판(Upstash)이 연결돼야 다른 휴대폰끼리 주고받아짐. 지금은 이 기기 안에서만.
+  const chatFind = (ref, buyerId) => S.chats.find((c) => c.ref.type === ref.type && c.ref.id === ref.id && c.buyerId === buyerId) || null;
+  const myChats = () => S.chats.filter((c) => c.sellerId === DEV || c.buyerId === DEV).sort((x, y) => new Date(y.updatedAt) - new Date(x.updatedAt));
+  const SEEN_KEY = 'hb2-seen:' + SESSION.username;   // 어디까지 읽었는지는 이 기기에만
+  const unread = (c) => { const seen = store.get(SEEN_KEY, {})[c.id] || 0; return c.msgs.filter((m) => m.from !== DEV && new Date(m.at) > new Date(seen)).length; };
+  const unreadAll = () => myChats().reduce((n, c) => n + unread(c), 0);
+  function markSeen(c) { const all = store.get(SEEN_KEY, {}); all[c.id] = new Date().toISOString(); store.set(SEEN_KEY, all); }
+  const otherAlias = (c) => (c.sellerId === DEV ? c.buyerAlias : c.sellerAlias);
+  const refPost = (c) => (c.ref.type === 'post' ? S.posts.find((p) => p.id === c.ref.id) : null);
+  function chatTitle(c) {
+    const kind = c.ref.type === 'program' ? '체험' : c.ref.type === 'want' ? '예약' : '';
+    return (kind ? kind + ' · ' : '') + c.title;
+  }
+  // 채팅 열기: 있으면 그 채팅, 없으면 첫 글을 보낼 때 만들 채팅(pending)
+  function openChat(ref) {
+    let c = null, pending = null;
+    if (ref.type === 'want') {
+      const w = S.wants.find((x) => x.id === ref.id); if (!w) return;
+      c = chatFind(ref, w.ownerId);
+      if (!c) pending = { ref, title: w.text.slice(0, 20), sellerId: DEV, sellerAlias: ME_ALIAS, buyerId: w.ownerId, buyerAlias: w.alias };
+      ui.chat.draft = c ? '' : `${w.text.slice(0, 20)} 기다리셨죠? 오늘 물질해서 올렸어요.`;
+    } else {
+      const item = ref.type === 'post' ? S.posts.find((p) => p.id === ref.id) : S.programs.find((p) => p.id === ref.id);
+      if (!item) return;
+      c = chatFind(ref, DEV);
+      const title = ref.type === 'post' ? A.label(item.species, item.variety) : item.title;
+      const lk = ref.type === 'post' && item.locker && A.locker(item.locker.id);
+      if (!c) pending = { ref, title, sellerId: item.ownerId, sellerAlias: item.author.alias, buyerId: DEV, buyerAlias: ME_ALIAS };
+      ui.chat.draft = c ? '' : ref.type === 'post' ? `${title} 주문하고 싶어요.${lk ? ` ${lk.name} 냉장고로 받을게요.` : ''}` : `${title} 하고 싶어요. 언제 되나요?`;
+    }
+    Object.assign(ui.chat, { id: c ? c.id : null, pending, pinOpen: false });
+    if (c) markSeen(c);
+    ui.tab[ui.role] = 'chat'; render(); window.scrollTo(0, document.body.scrollHeight);
+  }
+  // 보낼 글 검사: 욕설·비방은 막고 전화번호는 가림 (익명 유지)
+  function cleanMsg(text) {
+    const t = String(text || '').trim();
+    if (!t) return { ok: false, reason: '글을 적어 주세요.' };
+    const chk = A.checkReview(t);
+    if (!chk.ok) return { ok: false, reason: '🛡️ ' + chk.reason + ' 보내지 않았어요.' };
+    return { ok: true, text: A.maskPhone(t) };
+  }
+  async function sendMsg(msg) {
+    const pend = ui.chat.pending;
+    await mutate((s) => {
+      let c = ui.chat.id && s.chats.find((x) => x.id === ui.chat.id);
+      if (!c && pend) {
+        c = chatFind(pend.ref, pend.buyerId);   // 그사이 다른 기기에서 생겼을 수도
+        if (!c) { c = Object.assign({ id: A.uid('c'), createdAt: new Date().toISOString(), msgs: [] }, pend); s.chats.unshift(c); }
+      }
+      if (!c) throw new Error('채팅을 찾지 못했어요.');
+      c.msgs.push(Object.assign({ id: A.uid('m'), from: DEV, at: new Date().toISOString() }, msg));
+      c.msgs = c.msgs.slice(-200);
+      c.updatedAt = new Date().toISOString();
+      ui.chat.id = c.id; ui.chat.pending = null;
+      s.chats = s.chats.slice(0, 300);
+    });
+    const c = S.chats.find((x) => x.id === ui.chat.id); if (c) markSeen(c);
+  }
+  function chatList() {
+    const cs = myChats();
+    return `<div class="stack" style="gap:8px"><div class="eyebrow">💬 익명 채팅</div><h1>채팅</h1>
+        <p class="muted" style="margin:0">${IS_HAENYEO ? '손님은 별명으로만 보여요. 삼촌 이름과 전화번호도 손님에게 보이지 않아요.' : '삼촌은 별명으로만 보여요. 내 이름과 전화번호도 삼촌에게 보이지 않아요.'} 나는 <b>${esc(ME_ALIAS)}</b>예요.</p></div>
+      ${!CONFIG.shared ? '<div class="notice">지금은 이 기기 안에서만 주고받아져요. 공유 게시판을 연결하면 다른 휴대폰끼리 채팅돼요.</div>' : ''}
+      ${cs.length ? `<ul class="chat-list">${cs.map((c) => {
+        const last = c.msgs[c.msgs.length - 1], n = unread(c);
+        return `<li><button type="button" data-act="chat-open" data-id="${esc(c.id)}">
+          <span class="who"><b>${esc(otherAlias(c))}</b><time>${last ? esc(ago(last.at)) : ''}</time></span>
+          <span class="what">${esc(chatTitle(c))}${c.example ? ' · 예시' : ''}</span>
+          <span class="last">${last ? (last.kind === 'pin' ? '🔒 냉장고 비밀번호를 보냈어요' : esc(last.text)) : ''}</span>
+          ${n ? `<span class="badge num">${n}</span>` : ''}</button></li>`;
+      }).join('')}</ul>` : `<div class="empty">아직 채팅이 없어요. ${IS_HAENYEO ? '손님이 글을 보고 채팅을 보내면 여기에 와요.' : '해산물 글에서 "채팅으로 주문하기"를 눌러 보세요.'}</div>`}`;
+  }
+  function chatRoom() {
+    const c = ui.chat.id && S.chats.find((x) => x.id === ui.chat.id), pend = !c && ui.chat.pending;
+    const t = c || pend;
+    if (!t) { ui.chat.id = null; return chatList(); }
+    const iSell = t.sellerId === DEV;
+    const post = refPost(t), lk = post && post.locker && A.locker(post.locker.id);
+    const msgs = (c ? c.msgs : []).map((m) => {
+      const mine = m.from === DEV;
+      if (m.kind === 'pin' && m.pin) {
+        const l = A.locker(m.pin.locker), nv = l && A.navLinks(l);
+        return `<li class="msg pin ${mine ? 'me' : ''}"><div class="pin-card">
+          <b>🔒 냉장고 비밀번호</b>
+          <span>${l ? esc(l.name) + ' 냉장고 · ' : ''}${+m.pin.slot}번 칸${l ? ` <span class="muted">(${esc(l.place)})</span>` : ''}</span>
+          <span class="code num">${esc(m.pin.code)}</span>
+          ${m.pin.until ? `<span>${esc(m.pin.until)} 가져가 주세요.</span>` : ''}
+          ${nv ? `<a class="btn sm primary" href="${esc(nv.kakao)}" target="_blank" rel="noopener">카카오맵 길찾기</a>` : ''}
+        </div><time>${esc(ago(m.at))}</time></li>`;
+      }
+      return `<li class="msg ${mine ? 'me' : ''}"><p>${esc(m.text)}</p><time>${esc(ago(m.at))}</time></li>`;
+    }).join('');
+    const quick = iSell ? ['네, 있어요. 넣어 드릴게요.', '냉장고에 넣었어요.', '오늘은 다 팔렸어요. 죄송해요.'] : ['가져갔어요. 고맙습니다!', '몇 시에 넣어 주세요?'];
+    const p = ui.chat.pin;
+    const pinPanel = iSell && lk ? (ui.chat.pinOpen ? `<div class="pin-box">
+        <h3>🔒 이 손님에게만 비밀번호 보내기</h3>
+        <p class="small" style="margin:0"><b>${esc(lk.name)} 냉장고 ${+post.locker.slot}번 칸</b>에 넣고 자물쇠를 아래 번호로 맞춰 잠근 뒤 보내세요.</p>
+        <div class="grid2">
+          <label class="field">비밀번호<span class="row" style="flex-wrap:nowrap;gap:6px"><input type="text" id="pin-code" class="num" inputmode="numeric" maxlength="6" value="${esc(p.code)}"><button type="button" class="btn sm" data-act="pin-new" aria-label="새 비밀번호 만들기">↻</button></span></label>
+          <label class="field">가져갈 시간<input type="text" id="pin-until" value="${esc(p.until)}"></label>
+        </div>
+        <div class="row"><button type="button" class="btn primary" data-act="pin-send">채팅으로 보내기</button><button type="button" class="btn" data-act="pin-close">닫기</button></div>
+        <p class="muted small" style="margin:0">손님이 가져가면 자물쇠 번호를 바꿔 주세요.</p>
+      </div>` : `<button type="button" class="btn primary" data-act="pin-open">🔒 냉장고 비밀번호 보내기</button>`) : '';
+    return `<div class="chat-head">
+        <button type="button" class="btn sm" data-act="chat-back">← 채팅 목록</button>
+        <div class="grow"><b>${esc(iSell ? t.buyerAlias : t.sellerAlias)}</b><span class="muted small">${esc(chatTitle(t))}${lk ? ' · ' + esc(lk.name) + ' 냉장고 ' + (+post.locker.slot) + '번 칸' : ''}</span></div>
+        <span class="pill info">익명</span>
+      </div>
+      <ul class="msgs" aria-live="polite">${msgs || '<li class="muted small" style="text-align:center;list-style:none">첫 글을 보내 보세요. 이름과 전화번호는 보이지 않아요.</li>'}</ul>
+      ${pinPanel}
+      <div class="quick-replies">${quick.map((q) => `<button type="button" class="chip" data-act="chat-quick" data-v="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <div class="chat-input">
+        <textarea id="chat-text" rows="2" placeholder="채팅을 적어 주세요" aria-label="채팅 글">${esc(ui.chat.draft)}</textarea>
+        <button type="button" class="btn primary" data-act="chat-send">보내기</button>
+      </div>
+      <p class="muted small" style="margin:0">🛡️ 욕설·비방은 보내지지 않고, 전화번호는 가려져요. 안전을 위해 채팅에서만 이야기해요.</p>`;
+  }
+  const chatView = () => (ui.chat.id || ui.chat.pending ? chatRoom() : chatList());
   /* ---------- 먼저 보기 예약 ---------- */
   const myWants = () => S.wants.filter((w) => w.ownerId === DEV);
   const isEarly = (p) => p.earlyUntil && new Date(p.earlyUntil) > Date.now();
@@ -164,7 +297,7 @@
     const sp = SP[p.species];
     return `<article class="card teaser">
       <div class="row between"><h2>${esc(A.label(p.species, p.variety))} <span class="muted small">${esc(p.grade)}등급</span></h2><span class="pill warn">예약 손님 먼저 보는 중</span></div>
-      <p style="margin:0">${esc(p.author.village)} 해녀가 방금 ${esc(sp.ko)}${josa(sp.ko, '을', '를')} 올렸어요. 미리 예약한 손님이 먼저 보고 있어요.</p>
+      <p style="margin:0">${esc(regionName(p.author.region))} 해녀 삼촌이 방금 ${esc(sp.ko)}${josa(sp.ko, '을', '를')} 올렸어요. 미리 예약한 손님이 먼저 보고 있어요.</p>
       <p class="muted small" style="margin:0"><b class="num">${minsLeft(p.earlyUntil)}분</b> 뒤에 모두에게 공개돼요. 다음부터 먼저 보고 싶으면 📅 버튼으로 예약하세요.</p>
     </article>`;
   }
@@ -204,28 +337,26 @@
     ui.focusLocker = null;
   }
 
-  /* ---------- 후기 (해녀별 별점) ---------- */
-  const sellerKey = (a) => A.digitsOf(a && a.phone) || (a && a.name) || '';
-  const sellerReviews = (a) => (S.reviews || []).filter((r) => r.seller === sellerKey(a)).sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt));
+  /* ---------- 후기 (해녀별 별점, 해녀는 계정으로 구분) ---------- */
+  const sellerReviews = (p) => (S.reviews || []).filter((r) => r.seller === p.ownerId).sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt));
   // 게시판에 이미 있는 후기도 규칙에 걸리면 가리고 별점에서 뺌
   const shown = (r) => A.checkReview(r.text).ok;
-  function rating(a) {
-    const rs = sellerReviews(a).filter(shown);
+  function rating(p) {
+    const rs = sellerReviews(p).filter(shown);
     return rs.length ? { avg: rs.reduce((s, r) => s + r.stars, 0) / rs.length, n: rs.length } : null;
   }
   const starStr = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
   function reviewsBlock(p, owner) {
-    const rs = sellerReviews(p.author), f = ui.rev;
+    const rs = sellerReviews(p), f = ui.rev;
     const list = rs.map((r) => shown(r)
       ? `<li class="review"><div class="row between"><span class="stars" aria-label="별 ${r.stars}개">${starStr(r.stars)}</span><time class="muted small">${esc(ago(r.createdAt))}</time></div>
           <p>${esc(A.maskPhone(r.text))}</p>
-          <div class="kv"><span><b>${esc(r.name)}</b></span><span>${esc(A.label(r.species, null))}</span>${r.checked === 'ai' ? '<span class="ai-ok">🛡️ AI 검사 통과</span>' : ''}${r.example ? '<span class="pill info">예시</span>' : ''}</div></li>`
+          <div class="kv"><span><b>${esc(r.alias)}</b></span><span>${esc(A.label(r.species, null))}</span>${r.checked === 'ai' ? '<span class="ai-ok">🛡️ AI 검사 통과</span>' : ''}${r.example ? '<span class="pill info">예시</span>' : ''}</div></li>`
       : '<li class="review hidden-rv">욕설이나 비방이 있어 가려진 후기예요.</li>').join('');
-    const form = owner ? '' : `<div class="rev-form">
-        <h3>${esc(p.author.name)} 삼촌에게 후기 남기기</h3>
+    const form = owner || p.ownerId === DEV ? '' : `<div class="rev-form">
+        <h3>${esc(p.author.alias)}에게 후기 남기기 <span class="muted small" style="font-weight:400">${esc(ME_ALIAS)}(으)로 올라가요</span></h3>
         <div class="star-pick" role="group" aria-label="별점 고르기">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-act="rev-star" data-v="${n}" aria-label="${n}점" aria-pressed="${n <= f.stars}">★</button>`).join('')}<span class="num">${f.stars}점</span></div>
         <textarea id="rev-text" rows="3" placeholder="맛, 양, 신선도, 냉장고에서 찾기 쉬웠는지 적어 주세요. 아쉬운 점도 괜찮아요.">${esc(f.text)}</textarea>
-        <input type="text" id="rev-name" value="${esc(f.name)}" placeholder="이름 (별명도 돼요)" autocomplete="nickname">
         ${f.msg ? `<div class="banner mod"><span aria-hidden="true">🛡️</span><div><b>${esc(f.msg.kind)} 때문에 올리지 않았어요.</b> ${esc(f.msg.reason)}${f.msg.suggestion ? `<div class="suggest">“${esc(f.msg.suggestion)}”</div><button type="button" class="btn sm" data-act="rev-use">이렇게 고쳐 쓰기</button>` : ' 불만이 있었다면 무엇이 아쉬웠는지 사실대로 적어 주세요.'}</div></div>` : ''}
         <button type="button" class="btn primary" data-act="rev-save" data-id="${esc(p.id)}" ${f.busy ? 'disabled' : ''}>${f.busy ? 'AI가 살펴보는 중…' : '후기 올리기'}</button>
         <p class="muted small" style="margin:0">🛡️ AI 도우미가 욕설과 일방적인 비방은 걸러 내요. 맛·양·신선도에 대한 솔직한 불만은 그대로 올라가요.</p>
@@ -245,31 +376,13 @@
     return { ok: true, by: 'rule' };
   }
 
-  /* ---------- 비밀번호 보내기 (해녀 → 산 손님, 문자) ---------- */
-  // 비밀번호는 이 휴대폰(localStorage)에만 남기고 공유 게시판에는 올리지 않음
-  function pinForm(p) {
-    const l = lockerOf(p), f = ui.pin;
-    const sent = store.get('hb2-pins', {})[p.id] || [];
-    return `<div class="pin-box">
-      <h3>🔒 산 손님에게만 비밀번호 보내기</h3>
-      <p class="small" style="margin:0"><b>${esc(l.name)} 냉장고 ${+p.locker.slot}번 칸</b>에 넣고 자물쇠를 아래 번호로 맞춰 잠근 뒤 보내세요.</p>
-      <div class="grid2">
-        <label class="field">손님 전화번호<input type="text" id="pin-phone" inputmode="tel" value="${esc(f.phone)}" placeholder="010-0000-0000" autocomplete="off"></label>
-        <label class="field">비밀번호<span class="row" style="flex-wrap:nowrap;gap:6px"><input type="text" id="pin-code" class="num" inputmode="numeric" maxlength="6" value="${esc(f.code)}"><button type="button" class="btn sm" data-act="pin-new" aria-label="새 비밀번호 만들기">↻</button></span></label>
-      </div>
-      <label class="field">가져갈 시간<input type="text" id="pin-until" value="${esc(f.until)}"></label>
-      <button type="button" class="btn primary big" data-act="pin-send" data-id="${esc(p.id)}">문자로 보내기</button>
-      <p class="muted small" style="margin:0">비밀번호는 이 휴대폰에만 남고 게시판에는 올라가지 않아요. 손님이 가져가면 자물쇠 번호를 바꿔 주세요.</p>
-      ${sent.length ? `<ul class="feed">${sent.map((s) => `<li><time>${esc(ago(s.at))}</time><span>${esc(A.maskPhone(s.phone))}에게 <b class="num">${esc(s.code)}</b> 보냄</span></li>`).join('')}</ul>` : ''}
-    </div>`;
-  }
-
   function postCard(p, owner, i) {
     const sp = SP[p.species];
     const sold = p.status === 'sold';
-    const lk = lockerOf(p), rt = rating(p.author), nRev = sellerReviews(p.author).length, revOpen = ui.rev.postId === p.id;
+    const lk = lockerOf(p), rt = rating(p), nRev = sellerReviews(p).length, revOpen = ui.rev.postId === p.id;
+    const nChat = S.chats.filter((c) => c.ref.type === 'post' && c.ref.id === p.id).length;
     const ownerBtns = `<div class="row">
-        ${lk && !sold ? `<button type="button" class="btn primary sm" data-act="pin-open" data-id="${esc(p.id)}">🔒 비밀번호 보내기</button>` : ''}
+        ${nChat ? `<button type="button" class="btn primary sm" data-act="tab" data-v="chat">💬 이 글 채팅 ${nChat}개</button>` : ''}
         <button type="button" class="btn sm" data-act="toggle" data-id="${esc(p.id)}">${sold ? '다시 있어요로 바꾸기' : '다 팔렸어요'}</button>
         <button type="button" class="btn sm" data-act="share" data-id="${esc(p.id)}">홍보 글 복사</button>
         ${ui.delArm === p.id
@@ -280,17 +393,17 @@
     return `<article class="card ${sold ? 'sold' : ''} ${early ? 'match' : ''}">
       ${early ? `<div class="banner">📅 예약하신 ${esc(sp.ko)}${josa(sp.ko, '이', '가')} 올라왔어요! 다른 손님보다 먼저 보고 있어요. ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개돼요.</div>` : ''}
       ${owner && isEarly(p) ? `<div class="notice">예약 손님에게 먼저 보여주는 중 · ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개</div>` : ''}
-      <div class="post-h"><span class="no">No.${String((i || 0) + 1).padStart(2, '0')}</span><span class="by"><b>${esc(p.author.name)} 삼촌</b> · ${esc(p.author.village)}${rt ? `<span class="rate">★ ${rt.avg.toFixed(1)} <span class="muted">(${rt.n})</span></span>` : ''}</span></div>
+      <div class="post-h"><span class="no">No.${String((i || 0) + 1).padStart(2, '0')}</span><span class="by"><b>${esc(p.author.alias)}</b> · ${esc(regionName(p.author.region))}${rt ? `<span class="rate">★ ${rt.avg.toFixed(1)} <span class="muted">(${rt.n})</span></span>` : ''}</span></div>
       ${p.photo ? `<img class="photo" src="${esc(p.photo)}" alt="${esc(sp.ko)} 사진">` : ''}
       <div class="post-t"><h2>${esc(A.label(p.species, p.variety))} <span class="muted">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
       <div class="kv">${(p.author && (p.author.region || A.regionOf(p.author.village))) ? `<span>${esc(regionName(p.author.region || A.regionOf(p.author.village)))}${A.isSpecial(p.author.region || A.regionOf(p.author.village), p.species) ? ' 특산' : ''}</span>` : ''}<span>${esc(ago(p.createdAt))} 올림</span><span>양 <b>${kg(p.weightKg)}</b></span>${p.example ? '<span class="pill info">예시 글</span>' : ''}</div>
       ${lockerLine(p)}
       ${p.promo ? `<p class="promo">${esc(p.promo)}</p>` : ''}
       <div class="row between" style="align-items:flex-end">
-        ${p.askPerKg ? `<div class="price num" style="font-size:32px">${won(p.askPerKg).replace('원', '')}<small>원 / kg</small></div>` : '<strong>가격은 연락해서 물어보세요</strong>'}
+        ${p.askPerKg ? `<div class="price num" style="font-size:32px">${won(p.askPerKg).replace('원', '')}<small>원 / kg</small></div>` : '<strong>가격은 채팅으로 물어보세요</strong>'}
         ${p.refPerKg ? `<span class="muted small">참고 시세 kg당 ${won(p.refPerKg)}${p.refLive ? ' (aT)' : ''}</span>` : ''}
       </div>
-      ${owner ? ownerBtns + (ui.pinFor === p.id && lk ? pinForm(p) : '') : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 연락해 보세요.</p>' + contact(p.author, A.label(p.species, p.variety), lk) : contact(p.author, A.label(p.species, p.variety), lk))}
+      ${owner ? ownerBtns : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 채팅으로 물어보세요.</p>' : '') + chatBox({ type: 'post', id: p.id }, A.label(p.species, p.variety), p.ownerId, p.author, lk)}
       <button type="button" class="rev-toggle" data-act="rev-open" data-id="${esc(p.id)}" aria-expanded="${revOpen}">${rt ? `<span class="stars">★</span> ${rt.avg.toFixed(1)} · ` : ''}후기 ${nRev}개 ${revOpen ? '접기' : owner ? '보기' : '보기 · 쓰기'}</button>
       ${revOpen ? reviewsBlock(p, owner) : ''}
     </article>`;
@@ -306,15 +419,15 @@
         <div class="eyebrow">올렸어요</div>
         <h2>${esc(SP[p.species].ko)} 홍보 글이 손님 화면에 올라갔어요</h2>
         ${(() => { const ws = S.wants.filter((w) => w.matchedPostId === p.id); return ws.length ? `<div class="banner">이 해산물을 기다리던 손님 ${ws.length}명이 ${A.EARLY_MIN}분 먼저 보고 있어요.</div>
-          <ul class="feed">${ws.map((w) => `<li><time>${esc(ago(w.createdAt))}</time><span><b>${esc(w.name)}</b> “${esc(w.text)}”${w.phone ? `<br><a href="tel:${esc(digits(w.phone))}">${esc(w.phone)}</a> <span class="muted small">먼저 전화해 보세요</span>` : '<br><span class="muted small">전화번호 없음, 손님이 연락해 올 거예요</span>'}</span></li>`).join('')}</ul>` : ''; })()}
-        <p class="muted" style="margin:0">카카오톡 단체방이나 밴드에도 붙여 넣으면 더 많은 손님이 봐요. 거래는 손님 연락을 받고 직접 하시면 돼요.</p>
+          <ul class="feed">${ws.map((w) => `<li><time>${esc(ago(w.createdAt))}</time><span><b>${esc(w.alias)}</b> “${esc(w.text)}”<br><button type="button" class="btn sm" data-act="chat-want" data-id="${esc(w.id)}">💬 먼저 채팅 보내기</button></span></li>`).join('')}</ul>` : ''; })()}
+        <p class="muted" style="margin:0">카카오톡 단체방이나 밴드에도 붙여 넣으면 더 많은 손님이 봐요. 손님은 이름·전화번호 없이 채팅으로 주문해요.</p>
         <div class="row"><button type="button" class="btn primary" data-act="share" data-id="${esc(p.id)}">홍보 글 복사</button><button type="button" class="btn" data-act="dismiss-post">확인</button></div>
       </section>`;
     }
     if (d.status === 'idle') {
-      html += `<div class="stack"><div class="eyebrow">${[ui.me.village, ui.me.name + ' 해녀'].filter(Boolean).map(esc).join(' · ')}</div>
+      html += `<div class="stack"><div class="eyebrow">${esc(regionName(myRegion()))} · ${esc(ME_ALIAS)}</div>
         <h1>오늘 잡은 해산물을<br>찍어서 알리세요</h1>
-        <p class="muted" style="margin:0">사진 한 장이면 AI가 품목을 알아보고 홍보 글을 써 드려요. 손님이 보고 해녀님께 직접 전화해요. 수수료는 없어요.</p></div>
+        <p class="muted" style="margin:0">사진 한 장이면 AI가 품목을 알아보고 홍보 글을 써 드려요. 손님은 삼촌 이름·전화번호 없이 채팅으로 주문해요. 수수료는 없어요.</p></div>
         <label class="shoot" for="cam">
           <input id="cam" type="file" accept="image/*" capture="environment" aria-label="해산물 사진 찍기">
           <span class="ring">${I.camera.replace('<svg', '<svg width="38" height="38" style="color:#fff"')}</span>
@@ -328,7 +441,7 @@
         <p class="muted small" style="margin:0">물질 나가기 전에 보세요. 이 해산물을 올리면 예약한 손님이 ${A.EARLY_MIN}분 먼저 봐요.</p>
         ${Object.keys(waits).length ? Object.entries(waits).map(([k, ws]) => `<div class="item"><div class="thumb" aria-hidden="true">${k === 'etc' ? '?' : esc(SP[k].ko.slice(0, 1))}</div><div class="body">
           <div class="row between"><h3>${k === 'etc' ? '그 밖의 요청' : esc(SP[k].ko)}</h3><span class="pill warn">${ws.length}명</span></div>
-          <div class="want-list">${ws.map((w) => `<span><b>${esc(w.name)}</b> “${esc(w.text)}”</span>`).join('')}</div></div></div>`).join('') : '<div class="empty">지금 기다리는 손님이 없어요.</div>'}
+          <div class="want-list">${ws.map((w) => `<span><b>${esc(w.alias)}</b> “${esc(w.text)}” <button type="button" class="link" data-act="chat-want" data-id="${esc(w.id)}">💬 채팅</button></span>`).join('')}</div></div></div>`).join('') : '<div class="empty">지금 기다리는 손님이 없어요.</div>'}
       </section>`;
       return html;
     }
@@ -359,7 +472,7 @@
         <div class="eyebrow">가격 (손님에게 보여줄 값)</div>
         <div class="chips">
           <button type="button" class="chip" data-act="d-ask" data-v="on" aria-pressed="${d.askPerKg != null}">가격 적기</button>
-          <button type="button" class="chip" data-act="d-ask" data-v="off" aria-pressed="${d.askPerKg == null}">전화로 정하기</button>
+          <button type="button" class="chip" data-act="d-ask" data-v="off" aria-pressed="${d.askPerKg == null}">채팅으로 정하기</button>
         </div>
         ${d.askPerKg != null ? `
           <div class="price num">${won(d.askPerKg).replace('원', '')}<small>원 / kg</small></div>
@@ -381,14 +494,14 @@
         ${cur ? `<p class="muted small" style="margin:0">${esc(cur.place)}</p>
         <h3>몇 번 칸?</h3>
         <div class="chips">${Array.from({ length: cur.slots }, (_, k) => k + 1).map((n) => `<button type="button" class="chip" data-act="d-slot" data-v="${n}" aria-pressed="${d.locker.slot === n}">${n}번</button>`).join('')}</div>
-        <p class="small" style="margin:0">🔒 손님이 문자로 주문하면 이 칸에 넣고 잠근 뒤, <b>내 글</b>에서 ‘비밀번호 보내기’를 누르세요. 손님과 만나지 않아도 돼요.</p>`
-        : `<p class="muted small" style="margin:0">내 정보의 만나는 곳(${esc(ui.me.place || '없음')})이 손님에게 보여요.</p>`}
+        <p class="small" style="margin:0">🔒 손님이 채팅으로 주문하면 이 칸에 넣고 잠근 뒤, <b>채팅</b>에서 ‘냉장고 비밀번호 보내기’를 누르세요. 손님과 만나지 않아도 돼요.</p>`
+        : `<p class="muted small" style="margin:0">받는 곳과 시간은 손님과 채팅으로 정해요. 안전을 위해 냉장고를 권해요.</p>`}
       </section>`;
       })()}
       <section class="card">
-        <div class="eyebrow">손님이 연락할 곳</div>
-        <div class="kv"><span><b>${esc(ui.me.name)}</b> ${esc(ui.me.phone)}</span><span>${esc(ui.me.place)}</span><span>${esc(ui.me.hours)}</span></div>
-        ${isExample(ui.me) ? '<div class="banner">지금은 예시 연락처예요. 내 정보에서 진짜 이름과 전화번호로 바꿔 주세요.</div>' : ''}
+        <div class="eyebrow">손님에게 보이는 나</div>
+        <div class="kv"><span><b>${esc(ME_ALIAS)}</b></span><span>${esc(regionName(myRegion()))} 해녀</span>${ui.me.hours ? `<span>판매 시간 <b>${esc(ui.me.hours)}</b></span>` : ''}</div>
+        <p class="muted small" style="margin:0">🔒 이름과 전화번호는 손님에게 보이지 않아요. 손님은 채팅으로만 연락해요.</p>
         <button type="button" class="btn sm" data-act="tab" data-v="me">내 정보 고치기</button>
         <button type="button" class="btn primary big" data-act="publish">홍보 올리기</button>
         <button type="button" class="btn" data-act="retake">다시 찍기</button>
@@ -409,7 +522,7 @@
   function hExp() {
     const mine = S.programs.filter((p) => p.ownerId === DEV);
     return `<h1>체험 알리기</h1>
-      <p class="muted" style="margin:0">물질 체험, 해녀 밥상 같은 프로그램을 알리면 손님이 직접 연락해 날짜를 잡아요.</p>
+      <p class="muted" style="margin:0">물질 체험, 해녀 밥상 같은 프로그램을 알리면 손님이 채팅으로 날짜를 물어봐요.</p>
       ${ui.newProg ? `<section class="card">
         <label class="field">체험 이름<input type="text" id="pg-title" placeholder="해녀와 함께하는 물질 체험"></label>
         <label class="field">무엇을 하나요<textarea id="pg-desc" rows="3" placeholder="손님이 무엇을 배우고 경험하는지 적어 주세요"></textarea></label>
@@ -429,15 +542,14 @@
   function hMe() {
     const m = ui.me;
     return `<h1>내 정보</h1>
-      <p class="muted" style="margin:0">여기 적은 이름과 전화번호가 손님 화면에 그대로 보여요. 손님은 이 번호로 직접 연락해요.</p>
-      ${isExample(m) ? '<div class="banner">지금은 예시 정보예요. 진짜 정보로 바꿔 주세요.</div>' : ''}
       <section class="card">
-        <label class="field">이름<input type="text" id="me-name" value="${esc(m.name)}" autocomplete="name"></label>
-        <label class="field">어촌계<input type="text" id="me-village" value="${esc(m.village)}"></label>
-        <label class="field">지역 <span class="muted small" style="font-weight:400">특산품 추천과 지역 물가에 써요</span><select id="me-region">${Object.entries(A.REGIONS).map(([k, r]) => `<option value="${k}"${k === myRegion() ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
-        <label class="field">전화번호<input type="text" id="me-phone" value="${esc(m.phone)}" inputmode="tel" autocomplete="tel"></label>
-        <label class="field">손님과 만나는 곳<input type="text" id="me-place" value="${esc(m.place)}"></label>
-        <label class="field">판매 시간<input type="text" id="me-hours" value="${esc(m.hours)}"></label>
+        <div class="eyebrow">손님에게 보이는 이름</div>
+        <div class="alias-big">${esc(ME_ALIAS)}</div>
+        <p class="muted small" style="margin:0">🔒 삼촌 이름과 전화번호는 해녀바당에 저장하지 않고 손님에게도 보이지 않아요. 손님과는 채팅으로만 이야기하고, 해산물은 무인 냉장고로 주고받아요.</p>
+      </section>
+      <section class="card">
+        <label class="field">지역 <span class="muted small" style="font-weight:400">특산품 추천·지역 물가·냉장고 고르기에 써요</span><select id="me-region">${Object.entries(A.REGIONS).map(([k, r]) => `<option value="${k}"${k === myRegion() ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+        <label class="field">판매 시간 <span class="muted small" style="font-weight:400">선택, 손님에게 보여요</span><input type="text" id="me-hours" value="${esc(m.hours || '')}" placeholder="물질 끝나고 오후 3~5시"></label>
         <button type="button" class="btn primary big" data-act="me-save">저장</button>
       </section>`;
   }
@@ -465,8 +577,8 @@
           <button type="button" class="cal-btn" data-act="open-resv" aria-label="먼저 보기 예약${myWants().length ? ', 예약 ' + myWants().length + '개' : ''}" title="먼저 보기 예약"><span aria-hidden="true">📅</span>${arrived ? `<span class="badge num">${arrived}</span>` : myWants().length ? '<i class="cal-dot"></i>' : ''}</button>
         </div>
         <h1>오늘,<br>바다에서<br><em>왔습니다.</em></h1>
-        <p class="lede">해녀 삼촌이 숨 참고 따 온 해산물을 사진 그대로 알려 드려요. 사고파는 건 삼촌에게 전화나 문자로 직접 하세요.</p>
-        <div class="trust"><span>수수료 <b>0원</b></span><span>해녀와 직접 거래</span><span>오늘 물질한 것</span></div>
+        <p class="lede">해녀 삼촌이 숨 참고 따 온 해산물을 사진 그대로 알려 드려요. 이름·전화번호 없이 채팅으로 주문하고, 무인 냉장고에서 받아 가세요.</p>
+        <div class="trust"><span>수수료 <b>0원</b></span><span>익명 채팅</span><span>무인 냉장고</span></div>
         ${coverArt}
       </section>
       <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
@@ -522,16 +634,14 @@
     const r = ui.rv, mine = myWants();
     return `<button type="button" class="btn sm" data-act="close-resv" style="align-self:flex-start">← 해산물로 돌아가기</button>
       <div class="stack"><div class="eyebrow">📅 먼저 보기 예약</div><h1>원하는 해산물을<br>미리 예약하세요</h1>
-      <p class="muted" style="margin:0">예약한 해산물이 올라오면 다른 손님보다 ${A.EARLY_MIN}분 먼저 볼 수 있어요. 해녀에게도 기다리는 손님으로 알려져서 먼저 연락이 갈 수 있어요. 돈은 내지 않아요.</p></div>
+      <p class="muted" style="margin:0">예약한 해산물이 올라오면 다른 손님보다 ${A.EARLY_MIN}분 먼저 볼 수 있어요. 해녀에게는 <b>${esc(ME_ALIAS)}</b>(으)로만 보이고, 삼촌이 채팅으로 먼저 연락할 수 있어요. 돈은 내지 않아요.</p></div>
       <section class="card">
         <label class="field" for="rv-text">무엇을 기다리세요?<textarea id="rv-text" rows="3" placeholder="예: 큰 전복 1kg, 뿔소라 조금. 주말에 받고 싶어요">${esc(r.text)}</textarea></label>
         <p class="muted small" style="margin:0" id="rv-detect">${detectLine(r.text)}</p>
         <div class="stack" style="gap:6px"><span class="muted small">빠르게 넣기 (선택) · 누르면 위 글에 들어가요</span>
         <div class="chips small-chips">${Object.entries(SP).map(([k, v]) => `<button type="button" class="chip" data-act="rv-chip" data-v="${esc(v.ko)}">${esc(v.ko)}</button>`).join('')}</div></div>
-        <label class="field">이름<input type="text" id="rv-name" value="${esc(r.name)}" autocomplete="name" placeholder="해녀가 부를 이름"></label>
-        <label class="field">전화번호 (선택)<input type="text" id="rv-phone" value="${esc(r.phone)}" inputmode="tel" autocomplete="tel" placeholder="적으면 해녀가 먼저 연락할 수 있어요"></label>
         <button type="button" class="btn primary big" data-act="rv-save">예약하기</button>
-        <p class="muted small" style="margin:0">예약은 ${A.WANT_DAYS}일 동안 유지돼요. 전화번호는 해녀 화면에만 보여요.</p>
+        <p class="muted small" style="margin:0">예약은 ${A.WANT_DAYS}일 동안 유지돼요. 이름과 전화번호는 받지 않아요.</p>
       </section>
       <section class="stack"><h2>내 예약</h2>${mine.length ? mine.map((w) => {
         const p = w.matchedPostId && S.posts.find((x) => x.id === w.matchedPostId);
@@ -546,12 +656,12 @@
   /* ---------- 손님: 체험 ---------- */
   function cExp() {
     return `<h1>해녀 문화 체험</h1>
-      <p class="muted" style="margin:0">해녀 삼촌들이 직접 진행해요. 물때와 바다 날씨에 따라 날짜가 바뀌니 해녀에게 직접 연락해 정하세요.</p>
+      <p class="muted" style="margin:0">해녀 삼촌들이 직접 진행해요. 물때와 바다 날씨에 따라 날짜가 바뀌니 채팅으로 물어보세요.</p>
       ${S.programs.length ? S.programs.map((p) => `<div class="card">
         <div class="row between"><h2>${esc(p.title)}</h2>${p.example ? '<span class="pill info">예시</span>' : ''}</div>
         <p style="margin:0">${esc(p.desc)}</p>
         <div class="kv">${p.price ? `<span>1인 <b>${won(p.price)}</b></span>` : ''}${p.times ? `<span>${esc(p.times)}</span>` : ''}${p.season ? `<span>${esc(p.season)}</span>` : ''}</div>
-        ${contact(p.author, p.title + ' 체험')}
+        ${chatBox({ type: 'program', id: p.id }, p.title, p.ownerId, p.author, null)}
       </div>`).join('') : '<div class="empty">아직 알린 체험이 없어요.</div>'}`;
   }
 
@@ -560,12 +670,14 @@
     h: [
       { id: 'upload', label: '올리기', icon: I.camera, view: hUpload },
       { id: 'mine', label: '내 글', icon: I.list, view: hMine, badge: () => S.posts.filter((p) => p.ownerId === DEV && p.status !== 'sold').length },
+      { id: 'chat', label: '채팅', icon: I.chat, view: chatView, badge: unreadAll },
       { id: 'map', label: '지도', icon: I.map, view: mapView },
       { id: 'exp', label: '체험', icon: I.people, view: hExp },
       { id: 'me', label: '내 정보', icon: I.user, view: hMe }
     ],
     c: [
       { id: 'market', label: '해산물', icon: I.shop, view: cMarket, badge: () => S.posts.filter((p) => p.status !== 'sold').length },
+      { id: 'chat', label: '채팅', icon: I.chat, view: chatView, badge: unreadAll },
       { id: 'map', label: '지도', icon: I.map, view: mapView },
       { id: 'exp', label: '체험', icon: I.people, view: cExp }
     ]
@@ -577,7 +689,7 @@
   function render() {
     if (!S) return;
     document.body.classList.toggle('haenyeo', ui.role === 'h');
-    $('#account').innerHTML = `<span class="who"><b>${esc(String(SESSION.name || SESSION.username).replace('(예시)', ''))}${IS_HAENYEO ? ' 삼촌' : ' 님'}</b><span>${IS_HAENYEO ? '해녀' : '손님'}${SESSION.demo ? ' · 시연' : ''}</span></span><button type="button" class="btn" data-act="logout">로그아웃</button>`;
+    $('#account').innerHTML = `<span class="who"><b>${esc(ME_ALIAS)}</b><span>${IS_HAENYEO ? '해녀' : '손님'} · 익명</span></span><button type="button" class="btn" data-act="logout">로그아웃</button>`;
     $('#mode').innerHTML = `<span><i class="dot ${CONFIG.gemini ? 'on' : ''}"></i>사진 판별 ${CONFIG.gemini ? 'Gemini' : '데모'}</span><span><i class="dot ${CONFIG.priceN ? 'on' : ''}"></i>시세 ${CONFIG.priceN ? 'aT ' + CONFIG.priceN + '품목' : '기본 참고가'}</span>${CONFIG.regionN ? `<span><i class="dot on"></i>지역 물가 ${CONFIG.regionN}곳</span>` : ''}<span><i class="dot ${CONFIG.shared ? 'on' : ''}"></i>${CONFIG.shared ? '모든 손님에게 공유' : '이 기기에만 저장'}</span>`;
     const tabs = TABS[ui.role];
     const cur = tabs.find((t) => t.id === ui.tab[ui.role]) || (HIDDEN[ui.role] || []).find((t) => t.id === ui.tab[ui.role]) || tabs[0];
@@ -642,7 +754,7 @@
         locker: (() => { const l = A.lockersIn(myRegion())[0]; return l ? { id: l.id, slot: 1 } : null; })()
       });
       d.askPerKg = A.refPrice(rp(d)) || null;
-      d.promo = ai.promo || A.promo(Object.assign({ author: ui.me }, d));
+      d.promo = ai.promo || A.promo(Object.assign({ author: myAuthor() }, d));
     } catch (e) { d.status = 'error'; d.error = e.message; }
     render();
   }
@@ -650,10 +762,11 @@
   async function rewrite() {
     const d = ui.draft;
     const ta = $('#promo'); if (ta) d.promo = ta.value;
-    if (!CONFIG.gemini) { d.variant++; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); return; }
+    if (!CONFIG.gemini) { d.variant++; d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant); render(); return; }
     d.rewriting = true; render();
     const prompt = `제주 해녀가 직접 잡은 해산물 홍보 글을 새로 써라.
-품목: ${A.label(d.species, d.variety)}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 해녀: ${ui.me.name.replace('(예시)', '')}, 동네: ${ui.me.village}, 만나는 곳: ${ui.me.place || '없음'}, 판매 시간: ${ui.me.hours || '없음'}.
+품목: ${A.label(d.species, d.variety)}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 지역: ${regionName(myRegion())} 앞바다, 받는 곳: ${d.locker && A.locker(d.locker.id) ? A.locker(d.locker.id).name + ' 무인 냉장고' : '채팅으로 정함'}, 판매 시간: ${ui.me.hours || '없음'}.
+익명 게시판이라 해녀 이름·마을 이름·전화번호는 절대 쓰지 말고 "해녀 삼촌"이라고만 쓴다. 연락은 "채팅"으로 하라고 쓴다.
 홍보 글 규칙: 카카오톡 단체방·밴드에 올릴 진짜 홍보 글처럼 쓴다.
 1줄: 【】 안에 눈길 끄는 한 줄 (15자 안팎, 예: 【오늘 아침 막 올라온 홍해삼】, 【양식 아니고, 해녀가 직접 땄어요】)
 2~3줄: 누가 어디서 언제 잡았는지 + 맛·식감·향 같은 감각 표현 + 어떻게 먹으면 좋은지 한 가지. 해녀 어르신의 따뜻한 구어체("~요").
@@ -670,14 +783,14 @@
       if (!r.ok || !t) throw new Error(j.error?.message || '답이 비었어요');
       d.promo = t.replace(/^["“]|["”]$/g, '');
     } catch (e) {
-      d.variant++; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant);
+      d.variant++; d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant);
       toast('AI가 쓰지 못해서 기본 글로 바꿨어요.');
     }
     d.rewriting = false; render();
   }
 
   function keepRv() {
-    if ($('#rv-name')) { ui.rv.name = $('#rv-name').value.trim(); ui.rv.phone = $('#rv-phone').value.trim(); ui.rv.text = $('#rv-text').value; }
+    if ($('#rv-text')) ui.rv.text = $('#rv-text').value;
   }
   function detectLine(text) {
     if (!String(text || '').trim()) return '적으면 어떤 해산물인지 알아봐서 올라올 때 연결해 드려요.';
@@ -694,30 +807,28 @@
   /* ---------- 동작 ---------- */
   document.addEventListener('change', (e) => {
     if (e.target.id === 'cam' && e.target.files[0]) onPhoto(e.target.files[0]);
-    if (e.target.id === 'other-name') { const d = ui.draft; d.variety = e.target.value.trim() || null; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)) || d.askPerKg; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); }
+    if (e.target.id === 'other-name') { const d = ui.draft; d.variety = e.target.value.trim() || null; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)) || d.askPerKg; d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant); render(); }
   });
   document.addEventListener('input', (e) => {
     if (e.target.id === 'promo') ui.draft.promo = e.target.value;
     if (e.target.id === 'other-name') ui.draft.variety = e.target.value.trim() || null;
     if (e.target.id === 'rv-text') { ui.rv.text = e.target.value; $('#rv-detect').innerHTML = detectLine(e.target.value); }
     if (e.target.id === 'rev-text') ui.rev.text = e.target.value;
-    if (e.target.id === 'rev-name') ui.rev.name = e.target.value;
-    if (e.target.id === 'pin-phone') ui.pin.phone = e.target.value;
-    if (e.target.id === 'pin-code') ui.pin.code = e.target.value.replace(/\D/g, '');
-    if (e.target.id === 'pin-until') ui.pin.until = e.target.value;
+    if (e.target.id === 'chat-text') ui.chat.draft = e.target.value;
+    if (e.target.id === 'pin-code') ui.chat.pin.code = e.target.value.replace(/\D/g, '');
+    if (e.target.id === 'pin-until') ui.chat.pin.until = e.target.value;
   });
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const act = b.dataset.act, v = b.dataset.v, d = ui.draft;
     switch (act) {
       case 'logout': try { localStorage.removeItem('haenyeo_session'); } catch { /* 저장 안 되는 환경 */ } location.reload(); break;
-      case 'tab': ui.tab[ui.role] = v; ui.delArm = null; ui.lkFilter = null; render(); window.scrollTo(0, 0); break;
+      case 'tab': ui.tab[ui.role] = v; ui.delArm = null; ui.lkFilter = null; if (v === 'chat') Object.assign(ui.chat, { id: null, pending: null, pinOpen: false }); render(); window.scrollTo(0, 0); break;
       case 'filter': ui.filter = v; render(); break;
-      case 'copy': copy(v, '전화번호를 복사했어요.'); break;
       case 'dismiss-post': ui.lastPost = null; render(); break;
       case 'retake': ui.draft = { status: 'idle' }; render(); break;
-      case 'd-variety': d.variety = v || null; d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
-      case 'd-species': d.variety = null; d.species = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)); d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant); render(); break;
+      case 'd-variety': d.variety = v || null; d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant); render(); break;
+      case 'd-species': d.variety = null; d.species = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)); d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant); render(); break;
       case 'd-grade': d.grade = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)); render(); break;
       case 'd-fresh': d.freshness = v; if (d.askPerKg != null) d.askPerKg = A.refPrice(rp(d)); render(); break;
       case 'd-w': d.weightKg = Math.max(0.5, Math.round((d.weightKg + +v) * 10) / 10); render(); break;
@@ -727,12 +838,11 @@
       case 'publish': {
         const ta = $('#promo'); if (ta) d.promo = ta.value.trim();
         if (d.species === 'other' && !d.variety) { toast('해산물 이름을 적어 주세요.'); break; }
-        if (!ui.me.name || !ui.me.phone) { toast('손님이 연락할 이름과 전화번호를 먼저 적어 주세요.'); ui.tab.h = 'me'; render(); break; }
         b.disabled = true;
         run(async () => {
           const p = await mutate((s) => {
             const post = {
-              id: A.uid('p'), ownerId: DEV, author: Object.assign({}, ui.me),
+              id: A.uid('p'), ownerId: DEV, author: myAuthor(),
               species: d.species, variety: d.variety || null, grade: d.grade, freshness: d.freshness, weightKg: d.weightKg,
               refPerKg: A.refPrice(rp(d)), refLive: A.basePerKg(d.species, d.variety).live, askPerKg: d.askPerKg, photo: d.photo || null,
               promo: d.promo, createdAt: new Date().toISOString(), status: 'open',
@@ -753,8 +863,7 @@
       case 'del': ui.delArm = null; run(() => mutate((s) => { s.posts = s.posts.filter((x) => x.id !== b.dataset.id); })).then(() => toast('글을 내렸어요.')); break;
       case 'reset': run(async () => { S = A.seed(); store.set('hb2-state', S); if (CONFIG.shared) await pushShared(); ui.lastPost = null; render(); toast('예시 글로 되돌렸어요.'); }); break;
       case 'me-save': {
-        const m = { name: $('#me-name').value.trim(), village: $('#me-village').value.trim(), region: $('#me-region').value, phone: $('#me-phone').value.trim(), place: $('#me-place').value.trim(), hours: $('#me-hours').value.trim() };
-        if (!m.name || !digits(m.phone)) { toast('이름과 전화번호는 꼭 적어 주세요.'); break; }
+        const m = { region: $('#me-region').value, hours: $('#me-hours').value.trim() };
         ui.me = m; store.set(ME_KEY, m); toast('저장했어요. 다음에 올리는 글부터 이 정보가 보여요.');
         ui.tab.h = ui.draft.status === 'ready' ? 'upload' : 'me'; render();
         break;
@@ -782,14 +891,13 @@
         const r = ui.rv;
         const text = String(r.text || '').trim();
         if (!text) { toast('기다리는 해산물을 적어 주세요.'); break; }
-        if (!r.name) { toast('이름을 적어 주세요.'); break; }
-        store.set('hb2-guest', r);
+        const chk = cleanMsg(text); if (!chk.ok) { toast(chk.reason); break; }
         run(async () => {
           await mutate((s) => {
-            s.wants.unshift({ id: A.uid('w'), ownerId: DEV, name: r.name, phone: r.phone, text, species: A.detect(text), createdAt: new Date().toISOString(), matchedPostId: null });
+            s.wants.unshift({ id: A.uid('w'), ownerId: DEV, alias: ME_ALIAS, text: chk.text, species: A.detect(text), createdAt: new Date().toISOString(), matchedPostId: null });
           });
           const hit = A.detect(text);
-          ui.rv.text = ''; store.set('hb2-guest', ui.rv); render();
+          ui.rv.text = ''; render();
           toast(hit.length ? '예약했어요. 올라오면 먼저 보여 드릴게요.' : '예약했어요. 해산물을 못 알아봐서 해녀에게 요청으로 전할게요.');
         });
         break;
@@ -801,7 +909,7 @@
       case 'pg-save': {
         const t = $('#pg-title').value.trim();
         if (!t) { toast('체험 이름을 적어 주세요.'); break; }
-        const pg = { id: A.uid('pg'), ownerId: DEV, author: Object.assign({}, ui.me), title: t, desc: $('#pg-desc').value.trim(), price: +$('#pg-price').value || null, times: $('#pg-times').value.trim(), season: $('#pg-season').value.trim() };
+        const pg = { id: A.uid('pg'), ownerId: DEV, author: myAuthor(), title: t, desc: $('#pg-desc').value.trim(), price: +$('#pg-price').value || null, times: $('#pg-times').value.trim(), season: $('#pg-season').value.trim() };
         run(async () => { await mutate((s) => { s.programs.unshift(pg); }); ui.newProg = false; render(); toast('체험을 알렸어요.'); });
         break;
       }
@@ -809,7 +917,7 @@
       /* 무인 냉장고 */
       case 'd-locker':
         d.locker = v ? { id: v, slot: 1 } : null;
-        if (!d.ai.promo) d.promo = A.promo(Object.assign({ author: ui.me }, d), d.variant);   // 기본 틀 글이면 받는 곳 줄도 바꿈
+        if (!d.ai.promo) d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant);   // 기본 틀 글이면 받는 곳 줄도 바꿈
         render(); break;
       case 'd-slot': if (d.locker) d.locker.slot = +v; render(); break;
       case 'lk-show': {
@@ -820,21 +928,38 @@
       }
       case 'lk-items': ui.lkFilter = v; ui.filter = 'all'; ui.tab.c = 'market'; render(); window.scrollTo(0, 0); break;
       case 'lk-all': ui.lkFilter = null; render(); break;
-      case 'pin-open':
-        ui.pinFor = ui.pinFor === b.dataset.id ? null : b.dataset.id;
-        ui.pin = { code: A.newPin(), phone: '', until: '오늘 저녁 8시까지' }; render(); break;
-      case 'pin-new': ui.pin.code = A.newPin(); render(); break;
+      /* 채팅 */
+      case 'chat-start': openChat({ type: b.dataset.type, id: b.dataset.id }); break;
+      case 'chat-want': openChat({ type: 'want', id: b.dataset.id }); break;
+      case 'chat-open': {
+        const c = S.chats.find((x) => x.id === b.dataset.id); if (!c) break;
+        Object.assign(ui.chat, { id: c.id, pending: null, draft: '', pinOpen: false });
+        markSeen(c); render(); window.scrollTo(0, document.body.scrollHeight); break;
+      }
+      case 'chat-back': Object.assign(ui.chat, { id: null, pending: null, draft: '', pinOpen: false }); render(); window.scrollTo(0, 0); break;
+      case 'chat-quick': ui.chat.draft = v; render(); { const ta = $('#chat-text'); if (ta) ta.focus(); } break;
+      case 'chat-send': {
+        const ta = $('#chat-text'); if (ta) ui.chat.draft = ta.value;
+        const chk = cleanMsg(ui.chat.draft); if (!chk.ok) { toast(chk.reason); break; }
+        b.disabled = true;
+        run(async () => { await sendMsg({ text: chk.text }); ui.chat.draft = ''; render(); window.scrollTo(0, document.body.scrollHeight); })
+          .finally(() => { b.disabled = false; });
+        break;
+      }
+      // 냉장고 비밀번호: 이 채팅의 손님에게만 (전화번호 없이)
+      case 'pin-open': ui.chat.pinOpen = true; ui.chat.pin = { code: A.newPin(), until: ui.chat.pin.until || '오늘 저녁 8시까지' }; render(); break;
+      case 'pin-close': ui.chat.pinOpen = false; render(); break;
+      case 'pin-new': ui.chat.pin.code = A.newPin(); render(); break;
       case 'pin-send': {
-        const p = S.posts.find((x) => x.id === b.dataset.id), l = p && lockerOf(p); if (!l) break;
-        const f = ui.pin, ph = digits(f.phone), code = String(f.code || '').replace(/\D/g, '');
-        if (ph.length < 9) { toast('손님 전화번호를 적어 주세요.'); break; }
+        const c = S.chats.find((x) => x.id === ui.chat.id) || ui.chat.pending, p = c && refPost(c), l = p && lockerOf(p);
+        if (!l) break;
+        const code = String(ui.chat.pin.code || '').replace(/\D/g, '');
         if (code.length < 4) { toast('비밀번호를 4자리 이상으로 적어 주세요.'); break; }
-        const msg = `[해녀바당] ${A.label(p.species, p.variety)} 냉장고에 넣어 뒀어요.\n📍 ${l.name} 냉장고 ${+p.locker.slot}번 칸 (${l.place})\n🔒 비밀번호 ${code}\n${f.until ? f.until + ' 가져가 주세요.' : ''}\n길찾기: ${A.navLinks(l).kakao}\n가져가신 뒤 해녀바당에 후기 남겨 주세요. - ${ui.me.name.replace('(예시)', '')} 해녀`;
-        const all = store.get('hb2-pins', {});
-        all[p.id] = [{ phone: f.phone, code, at: new Date().toISOString() }].concat(all[p.id] || []).slice(0, 10);
-        store.set('hb2-pins', all);
-        render(); toast('문자 앱을 열었어요. 보내기를 눌러 주세요.');
-        location.href = `sms:${ph}?body=${encodeURIComponent(msg)}`;
+        run(async () => {
+          await sendMsg({ kind: 'pin', text: '🔒 냉장고 비밀번호', pin: { locker: l.id, slot: +p.locker.slot, code, until: ui.chat.pin.until } });
+          ui.chat.pinOpen = false; render(); window.scrollTo(0, document.body.scrollHeight);
+          toast('비밀번호를 이 손님에게만 보냈어요.');
+        });
         break;
       }
       /* 후기 */
@@ -847,18 +972,16 @@
       case 'rev-save': {
         const p = S.posts.find((x) => x.id === b.dataset.id); if (!p) break;
         const f = ui.rev;
-        f.text = String(f.text || '').trim(); f.name = String(f.name || '').trim();
+        f.text = String(f.text || '').trim();
         if (f.text.length < 5) { toast('후기를 조금 더 적어 주세요.'); break; }
-        if (!f.name) { toast('이름을 적어 주세요.'); break; }
         f.busy = true; f.msg = null; render();
         run(async () => {
           const res = await moderate(f.text, f.stars, A.label(p.species, p.variety));
           if (!res.ok) { f.msg = res; return; }
           await mutate((s) => {
-            s.reviews.unshift({ id: A.uid('r'), ownerId: DEV, postId: p.id, seller: sellerKey(p.author), species: p.species, stars: f.stars, text: A.maskPhone(f.text), name: f.name, createdAt: new Date().toISOString(), checked: res.by });
+            s.reviews.unshift({ id: A.uid('r'), ownerId: DEV, postId: p.id, seller: p.ownerId, species: p.species, stars: f.stars, text: A.maskPhone(f.text), alias: ME_ALIAS, createdAt: new Date().toISOString(), checked: res.by });
             s.reviews = s.reviews.slice(0, 200);
           });
-          ui.rv.name = f.name; store.set('hb2-guest', ui.rv);
           f.text = ''; f.stars = 5;
           toast('후기를 올렸어요. 고마워요!');
         }).finally(() => { f.busy = false; render(); });
@@ -866,6 +989,18 @@
       }
     }
   });
+
+  // 채팅 화면을 보고 있으면 5초마다 새 글을 받아옴 (공유 게시판일 때, 입력 중이면 건너뜀)
+  setInterval(() => {
+    if (!CONFIG.shared || ui.tab[ui.role] !== 'chat') return;
+    const busy = document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName);
+    if (busy) return;
+    fetchShared().then((d) => {
+      if (!d || d.v !== 2) return;
+      const before = JSON.stringify(S.chats); S = norm(d);
+      if (JSON.stringify(S.chats) !== before) { const c = S.chats.find((x) => x.id === ui.chat.id); if (c) markSeen(c); render(); }
+    }).catch(() => {});
+  }, 5000);
 
   // 공유 게시판이면 다른 해녀가 올린 글을 30초마다 받아옴 (입력 중이면 건너뜀)
   setInterval(() => {

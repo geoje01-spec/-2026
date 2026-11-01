@@ -150,21 +150,19 @@
   };
   function promo({ species, variety, grade, freshness, weightKg, author, locker: box }, variant) {
     const ko = label(species, variety);
-    const name = author && author.name ? author.name.replace(/\(예시\)/, '').trim() : '';
-    const who = name ? name + ' 해녀' : '해녀';
-    const sea = author && author.village ? author.village.replace(/ 어촌계$/, '') + ' 앞바다' : '제주 앞바다';
+    // 익명: 해녀 이름·마을·만나는 곳은 쓰지 않고 지역 바다만 씀
+    const sea = ((author && REGIONS[author.region]) || REGIONS.jeju).name + ' 앞바다';
     const taste = TASTE[species] || '바다에서 바로 올라와 맛이 살아 있어요';
     const alive = freshness === '최상' ? '아직 살아서 꿈틀거려요' : freshness === '보통' ? '오늘 안에 드시는 걸 권해요' : '오늘 아침 물질한 거라 싱싱해요';
     const top = grade === '특' ? '큰 놈들로만 골랐어요' : grade === '상' ? '알 좋은 걸로 골랐어요' : '집에서 편하게 드시기 좋은 크기예요';
-    const where = author && author.place ? author.place : '';
     const when = author && author.hours ? author.hours : '';
     const lk = box && LOCKERS.find((l) => l.id === box.id);
     const pickup = lk ? `\n🧊 ${lk.name} 무인 냉장고(${lk.place})에서 비밀번호로 가져가세요`
-      : where || when ? `\n📍 ${[where, when].filter(Boolean).join(' · ')}` : '';
+      : when ? `\n⏰ ${when}` : '';
     const v = [
-      `【오늘 ${sea}에서 막 올라온 ${ko}】\n${who}가 숨 참고 한 개 한 개 따 온 ${ko}${josa(ko, '이에요', '예요')}. ${alive}. ${taste}.\n오늘 들어온 건 ${weightKg}kg뿐이에요. 다 나가면 다음 물질 때까지 없어요.${pickup}`,
-      `【양식 아니고, 해녀가 직접 땄어요】\n${sea} ${ko}, ${top}. ${taste}.\n중간 상인 없이 바다에서 바로 식탁으로 가요. 먼저 연락 주시는 분께 드려요.${pickup}`,
-      `${ko} 좋아하시는 분, 오늘이에요 🌊\n${sea} 물이 차고 맑아서 살이 꽉 찼어요. ${alive}. ${taste}.\n${weightKg}kg 한정이에요. 전화나 문자 주시면 챙겨 둘게요.${pickup}`
+      `【오늘 ${sea}에서 막 올라온 ${ko}】\n해녀 삼촌이 숨 참고 한 개 한 개 따 온 ${ko}${josa(ko, '이에요', '예요')}. ${alive}. ${taste}.\n오늘 들어온 건 ${weightKg}kg뿐이에요. 다 나가면 다음 물질 때까지 없어요.${pickup}`,
+      `【양식 아니고, 해녀가 직접 땄어요】\n${sea} ${ko}, ${top}. ${taste}.\n중간 상인 없이 바다에서 바로 식탁으로 가요. 먼저 채팅 주시는 분께 드려요.${pickup}`,
+      `${ko} 좋아하시는 분, 오늘이에요 🌊\n${sea} 물이 차고 맑아서 살이 꽉 찼어요. ${alive}. ${taste}.\n${weightKg}kg 한정이에요. 채팅 주시면 챙겨 둘게요.${pickup}`
     ];
     return v[(variant || 0) % v.length];
   }
@@ -275,50 +273,72 @@
   // 후기에 남긴 전화번호는 가림 (개인정보)
   const maskPhone = (t) => String(t || '').replace(/(01[016789])[-\s.]?\d{3,4}[-\s.]?(\d{4})/g, '$1-****-$2');
 
-  const EXAMPLE_ME = { name: '김순덕(예시)', village: '하도 어촌계', region: 'jeju', phone: '010-0000-0000', place: '하도 어촌계 해녀 판매장', hours: '물질 끝나고 오후 3~5시' };
+  /* ---------- 익명 별명 ---------- */
+  // 이름·전화번호 대신 계정마다 늘 같은 별명 (해녀 "삼촌 바37", 손님 "손님 하12")
+  const SYL = '가나다라마바사아자차카타파하';
+  function aliasCode(key) {
+    let h = 5381; for (const c of String(key || '')) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0;
+    return SYL[h % SYL.length] + (10 + (Math.floor(h / SYL.length) % 90));
+  }
+  const alias = (kind, key) => (kind === 'haenyeo' ? '삼촌 ' : '손님 ') + aliasCode(key);
+
+  // 해녀 내 정보: 손님에게 보이는 건 지역·판매 시간뿐 (이름·전화번호는 저장하지 않음)
+  const EXAMPLE_ME = { region: 'jeju', hours: '물질 끝나고 오후 3~5시' };
 
   const digitsOf = (p) => String(p || '').replace(/[^\d]/g, '');
   function seed() {
     const now = Date.now();
     const h = (n) => iso(now - n * 3600 * 1000);
-    const a1 = Object.assign({}, EXAMPLE_ME);
-    const a2 = { name: '고옥자(예시)', village: '종달 어촌계', region: 'jeju', phone: '010-0000-0001', place: '종달리 포구 앞', hours: '오전 11시~오후 2시' };
-    const mk = (author, species, grade, freshness, weightKg, ask, hrs, status, box) => {
+    // 예시 해녀 1은 "해녀로 둘러보기" 계정 것이라, 시연 때 손님 채팅을 해녀 화면에서 바로 받아 볼 수 있음
+    const H1 = 'u:demo-haenyeo', H2 = 'seed-h2', G1 = 'u:demo-guest';
+    const a1 = { alias: alias('haenyeo', H1), region: 'jeju', hours: EXAMPLE_ME.hours };
+    const a2 = { alias: alias('haenyeo', H2), region: 'jeju', hours: '오전 11시~오후 2시' };
+    const mk = (owner, author, species, grade, freshness, weightKg, ask, hrs, status, box) => {
       const locker = box ? { id: box[0], slot: box[1] } : null;
       return {
-        id: uid('p'), ownerId: 'seed', example: true, author, species, grade, freshness, weightKg,
+        id: uid('p'), ownerId: owner, example: true, author, species, grade, freshness, weightKg,
         refPerKg: refPrice({ species, grade, freshness }), askPerKg: ask, photo: null,
         promo: promo({ species, grade, freshness, weightKg, author, locker }, hrs), createdAt: h(hrs), status: status || 'open', locker
       };
     };
     const posts = [
-      mk(a1, 'abalone', '특', '최상', 3, 45000, 1, null, ['jeju-1', 2]),
-      mk(a2, 'turban', '상', '좋음', 5, 13000, 2, null, ['jeju-2', 1]),
-      mk(a1, 'seaweed', '상', '좋음', 4, null, 5, null, ['jeju-1', 4]),
-      mk(a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold', ['jeju-2', 3])
+      mk(H1, a1, 'abalone', '특', '최상', 3, 45000, 1, null, ['jeju-1', 2]),
+      mk(H2, a2, 'turban', '상', '좋음', 5, 13000, 2, null, ['jeju-2', 1]),
+      mk(H1, a1, 'seaweed', '상', '좋음', 4, null, 5, null, ['jeju-1', 4]),
+      mk(H2, a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold', ['jeju-2', 3])
     ];
-    const rv = (post, stars, text, name, hrs) => ({ id: uid('r'), ownerId: 'seed', example: true, postId: post.id, seller: digitsOf(post.author.phone), species: post.species, stars, text, name, createdAt: h(hrs), checked: 'rule' });
+    const rv = (post, stars, text, by, hrs) => ({ id: uid('r'), ownerId: by, example: true, postId: post.id, seller: post.ownerId, species: post.species, stars, text, alias: alias('general', by), createdAt: h(hrs), checked: 'rule' });
+    const g = (k) => 'seed-g' + k;
     return {
       v: 2,
       posts,
       reviews: [
-        rv(posts[0], 5, '전복이 정말 커요. 냉장고에서 바로 찾아서 기다릴 필요가 없었어요.', '정하늘(예시)', 0.5),
-        rv(posts[0], 4, '맛은 좋았는데 생각보다 작은 게 두어 개 섞여 있었어요.', '윤서(예시)', 0.8),
-        rv(posts[3], 5, '살짝 데쳐 먹었는데 부드럽고 달아요. 길찾기로 냉장고도 금방 찾았어요.', '민준(예시)', 20)
+        rv(posts[0], 5, '전복이 정말 커요. 냉장고에서 바로 찾아서 기다릴 필요가 없었어요.', g(1), 0.5),
+        rv(posts[0], 4, '맛은 좋았는데 생각보다 작은 게 두어 개 섞여 있었어요.', g(2), 0.8),
+        rv(posts[3], 5, '살짝 데쳐 먹었는데 부드럽고 달아요. 길찾기로 냉장고도 금방 찾았어요.', g(3), 20)
       ],
       wants: [
-        { id: 'w-seed1', ownerId: 'seed', example: true, name: '박지은(예시)', phone: '010-0000-0002', text: '성게알 0.5kg 정도, 주말에 받고 싶어요', species: ['urchinroe'], createdAt: h(20), matchedPostId: null },
-        { id: 'w-seed2', ownerId: 'seed', example: true, name: '이도윤(예시)', phone: '', text: '돌문어 큰 걸로 한 마리', species: ['octopus'], createdAt: h(9), matchedPostId: null }
+        { id: 'w-seed1', ownerId: g(4), example: true, alias: alias('general', g(4)), text: '성게알 0.5kg 정도, 주말에 받고 싶어요', species: ['urchinroe'], createdAt: h(20), matchedPostId: null },
+        { id: 'w-seed2', ownerId: g(5), example: true, alias: alias('general', g(5)), text: '돌문어 큰 걸로 한 마리', species: ['octopus'], createdAt: h(9), matchedPostId: null }
       ],
+      // 예시 채팅: "손님으로 둘러보기" ↔ "해녀로 둘러보기"
+      chats: [{
+        id: 'c-seed1', example: true, ref: { type: 'post', id: posts[0].id }, title: label('abalone'),
+        sellerId: H1, sellerAlias: a1.alias, buyerId: G1, buyerAlias: alias('general', G1), createdAt: h(0.6), updatedAt: h(0.4),
+        msgs: [
+          { id: 'm1', from: G1, text: '전복 1kg 주문하고 싶어요. 제주-1 냉장고로 받을게요.', at: h(0.6) },
+          { id: 'm2', from: H1, text: '네, 오후 4시에 2번 칸에 넣어 둘게요. 넣고 비밀번호 보내 드릴게요.', at: h(0.4) }
+        ]
+      }],
       programs: [
-        { id: 'pg1', ownerId: 'seed', example: true, author: a1, title: '해녀와 함께하는 물질 체험', desc: '해녀 삼촌에게 테왁 잡는 법과 숨 고르는 법을 배우고 얕은 바다에서 소라를 직접 찾아봐요.', price: 70000, times: '오전 10시, 오후 2시 (2시간)', season: '5~10월, 물때와 날씨에 따라 쉬어요' },
-        { id: 'pg2', ownerId: 'seed', example: true, author: a2, title: '불턱 이야기와 해녀 밥상', desc: '물질 뒤 몸을 녹이던 불턱에 둘러앉아 해녀 이야기를 듣고, 그날 잡은 해산물로 차린 밥상을 함께 먹어요.', price: 45000, times: '낮 12시, 저녁 5시 30분 (1시간 30분)', season: '사계절' }
+        { id: 'pg1', ownerId: H1, example: true, author: a1, title: '해녀와 함께하는 물질 체험', desc: '해녀 삼촌에게 테왁 잡는 법과 숨 고르는 법을 배우고 얕은 바다에서 소라를 직접 찾아봐요.', price: 70000, times: '오전 10시, 오후 2시 (2시간)', season: '5~10월, 물때와 날씨에 따라 쉬어요' },
+        { id: 'pg2', ownerId: H2, example: true, author: a2, title: '불턱 이야기와 해녀 밥상', desc: '물질 뒤 몸을 녹이던 불턱에 둘러앉아 해녀 이야기를 듣고, 그날 잡은 해산물로 차린 밥상을 함께 먹어요.', price: 45000, times: '낮 12시, 저녁 5시 30분 (1시간 30분)', season: '사계절' }
       ]
     };
   }
 
   const api = { REGIONS, regionOf, nearestRegion, isSpecial, setRegionIndex, regionFactor, regionNote, label, VARIETIES, detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET,
-    LOCKERS, locker, lockersIn, navLinks, newPin, checkReview, maskPhone, digitsOf };
+    LOCKERS, locker, lockersIn, navLinks, newPin, checkReview, maskPhone, digitsOf, aliasCode, alias };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);

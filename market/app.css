@@ -370,3 +370,36 @@ main.auth { display: none; max-width: 440px; padding-block: 28px 90px; gap: 20px
 .slot.on b { color: var(--sea); }
 .slot.mine { border-color: var(--tewak); }
 .slot.mine b { color: var(--tewak); }
+
+/* 익명 채팅 */
+.alias-big { font-family: var(--serif); font-weight: 800; font-size: 34px; letter-spacing: -0.02em; line-height: 1.1; }
+.chat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--ink); }
+.chat-list li button { position: relative; width: 100%; display: flex; flex-direction: column; gap: 2px; padding: 14px 44px 14px 2px; border: 0; border-bottom: 1px solid var(--rule); background: none; text-align: left; cursor: pointer; color: var(--ink); font: inherit; }
+.chat-list li button:hover { background: var(--paper-3); }
+.chat-list .who { display: flex; justify-content: space-between; gap: 8px; }
+.chat-list .who b { font-family: var(--serif); font-weight: 800; font-size: 18px; }
+.chat-list .who time { font-size: 12.5px; color: var(--ink-2); }
+.chat-list .what { font-size: 13px; font-weight: 700; color: var(--sea); }
+.chat-list .last { font-size: 14.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-list .badge { top: 50%; left: auto; right: 8px; transform: translateY(-50%); min-width: 22px; height: 22px; font-size: 12px; }
+.chat-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--ink); }
+.chat-head .grow { display: flex; flex-direction: column; line-height: 1.3; }
+.chat-head .grow b { font-family: var(--serif); font-weight: 800; font-size: 20px; }
+.msgs { list-style: none; margin: 0; padding: 4px 0; display: flex; flex-direction: column; gap: 10px; }
+.msg { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 86%; }
+.msg p { margin: 0; padding: 10px 14px; border-radius: 4px 16px 16px 16px; background: var(--paper-2); border: 1px solid var(--rule); white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
+.msg time { font-size: 11.5px; color: var(--ink-2); padding: 0 4px; }
+.msg.me { align-self: flex-end; align-items: flex-end; }
+.msg.me p { background: var(--ink); color: var(--paper); border-color: var(--ink); border-radius: 16px 4px 16px 16px; }
+body.haenyeo .msg p { font-size: 18px; }
+.pin-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 2px solid var(--tewak); border-radius: var(--r); background: var(--paper-2); min-width: 220px; }
+.pin-card b { color: var(--tewak); }
+.pin-card .code { font-family: var(--serif); font-weight: 800; font-size: 40px; letter-spacing: .18em; line-height: 1.1; color: var(--ink); }
+.pin-card .btn { align-self: flex-start; margin-top: 4px; }
+.quick-replies { display: flex; gap: 6px; flex-wrap: wrap; }
+.quick-replies .chip { min-height: 38px; padding: 5px 12px; font-size: 14px; font-weight: 600; }
+.chat-input { display: flex; gap: 8px; align-items: flex-end; position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); background: var(--paper); padding: 8px 0; z-index: 2; }
+.chat-input textarea { min-height: 52px; flex: 1; }
+.chat-input .btn { flex: none; min-height: 52px; }
+body.haenyeo .tabs button { font-size: 14.5px; }
+@media (max-width: 420px) { .brand small { display: none; } .account .btn { padding: 4px 9px; } }
