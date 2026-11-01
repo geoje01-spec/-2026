@@ -317,11 +317,15 @@
         : `<button type="button" class="sp-chip" data-act="sp-resv" data-v="${esc(A.label(k, v))}"><b>${esc(A.label(k, v))}</b><span>📅 예약</span></button>`;
     }).join('');
     const arrived = myWants().filter((w) => w.matchedPostId).length;
-    return `<div class="row between" style="align-items:flex-start;flex-wrap:nowrap">
-        <div class="stack"><div class="eyebrow">${esc(regionName(R))} 해녀가 직접 알려요</div><h1>오늘 바다에서<br>올라온 해산물</h1></div>
-        <button type="button" class="cal-btn" data-act="open-resv" aria-label="먼저 보기 예약${myWants().length ? ', 예약 ' + myWants().length + '개' : ''}" title="먼저 보기 예약"><span aria-hidden="true">📅</span>${arrived ? `<span class="badge num">${arrived}</span>` : myWants().length ? '<i class="cal-dot"></i>' : ''}</button>
-      </div>
-      <div class="notice">해녀바당은 알리기만 도와요. 사고파는 건 해녀에게 전화나 문자로 직접 하세요. 수수료가 없어요.</div>
+    return `<section class="hero">
+        <div class="row between" style="align-items:flex-start;flex-wrap:nowrap">
+          <div class="stack" style="gap:8px"><div class="eyebrow">${esc(regionName(R))} 해녀가 직접 알려요</div><h1>오늘 바다에서<br><em>막 올라온</em> 해산물</h1></div>
+          <button type="button" class="cal-btn" data-act="open-resv" aria-label="먼저 보기 예약${myWants().length ? ', 예약 ' + myWants().length + '개' : ''}" title="먼저 보기 예약"><span aria-hidden="true">📅</span>${arrived ? `<span class="badge num">${arrived}</span>` : myWants().length ? '<i class="cal-dot"></i>' : ''}</button>
+        </div>
+        <div class="trust"><span>수수료 <b>0원</b></span><span>해녀와 직접 거래</span><span>오늘 물질한 것</span></div>
+        <p class="small" style="margin:0;opacity:.82">해녀바당은 알리기만 도와요. 사고파는 건 해녀에게 전화나 문자로 직접 하세요.</p>
+        ${waves.replace('class="waves"', 'class="waves back"')}${waves}
+      </section>
       <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
       <section class="card special"><div class="eyebrow">★ ${esc(regionName(R))} 특산품 추천</div><div class="sp-grid">${specials}</div><p class="muted small" style="margin:0">있는 건 눌러서 보고, 없는 건 예약해 두면 올라올 때 먼저 보여 드려요.</p></section>
       <div class="chips"><button type="button" class="chip" data-act="filter" data-v="all" aria-pressed="${ui.filter === 'all'}">전체</button>${kinds.map((k) => `<button type="button" class="chip" data-act="filter" data-v="${k}" aria-pressed="${ui.filter === k}">${esc(SP[k].ko)}</button>`).join('')}</div>
