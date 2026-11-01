@@ -25,7 +25,7 @@
 | `haenyeo_sender_makecode.ts` | 해녀용 마이크로비트 (MakeCode JavaScript) |
 | `receiver_makecode.ts` | 수신용 마이크로비트 (PC에 USB로 연결) |
 | `buoy_receiver_python.py` | 부표(태왁) 마이크로비트, MakeCode Python. 라디오 그룹 1, 해녀 1명의 입수·복귀·SOS를 사건 줄로 알림 |
-| `buoy_sender_python.py` | 부표 방식의 해녀용 마이크로비트, MakeCode Python. 0.3초마다 1, A+B는 SOS 99를 5초 (사용자 원본 해녀용 코드는 저장소에 없어 새로 만듦) |
+| `buoy_sender_python.py` | 부표 방식의 해녀용 마이크로비트, MakeCode Python. 물 위 상태 동안 0.3초마다 1을 계속 보냄. 시연용 버튼: A 물 위(보냄)·B 물속(멈춤)·A+B SOS 99를 5초. 사용자 원본은 버튼을 누를 때만 보내서 부표가 3초 뒤 입수로 봤음(저장소에 없어 새로 만듦) |
 | `server.py` | Vercel 없이 PC에서 돌릴 때 쓰는 파이썬 서버 (키는 환경변수) |
 | `vercel.json` | 지역 icn1, 함수 시간 제한 (analyze 60초, price·region 30초) |
 
