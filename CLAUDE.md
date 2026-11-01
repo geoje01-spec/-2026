@@ -24,6 +24,7 @@
 | `api/*.js` | Vercel 서버 함수 (Node, CommonJS). API 키를 숨기고 외부 API를 대신 호출 |
 | `haenyeo_sender_makecode.ts` | 해녀용 마이크로비트 (MakeCode JavaScript) |
 | `receiver_makecode.ts` | 수신용 마이크로비트 (PC에 USB로 연결) |
+| `buoy_receiver_python.py` | 부표(태왁) 마이크로비트, MakeCode Python. 라디오 그룹 1, 해녀 1명의 입수·복귀·SOS를 사건 줄로 알림 |
 | `server.py` | Vercel 없이 PC에서 돌릴 때 쓰는 파이썬 서버 (키는 환경변수) |
 | `vercel.json` | 지역 icn1, 함수 시간 제한 (analyze 60초, price·region 30초) |
 
@@ -87,6 +88,8 @@
 | `Q,번호` | 관제 → 해녀 | 괜찮으세요? (놀란 얼굴 + 소리) |
 | `R,번호` / `R,0` | 관제 → 해녀 | 쉬러 나오세요 (위쪽 화살표 + 소리 10초). 물속이면 올라올 때 다시 보냄 |
 | `H,번호` | 관제 → 다른 해녀 | 동료가 물속에서 안 올라옴 (경고 표시 15초) |
+
+**부표 마이크로비트(`buoy_receiver_python.py`, 사용자 제공)**: 위 형식 대신 사건만 USB로 보냄 — `EVENT: DIVER SUBMERGED`(신호 2초 끊김), `EVENT: DIVER RETURNED TO SURFACE`, `ALERT: EMERGENCY SOS BUTTON PRESSED BY DIVER!`(해녀가 99를 보냄), `ALERT: EMERGENCY DIVER TIME EXCEEDED`(부표 기준 10초, 시연용). 해녀 마이크로비트는 라디오 그룹 1에서 숫자를 계속 보냄. 웹앱 `ingest`가 `EVENT:`/`ALERT:` 줄을 보면 `buoyEvent`로 처리: 해녀 1번, 물 위에 있는 동안은 1초마다 "물 위" 신호를 대신 넣어 기존 규칙을 그대로 씀(맥박·온도는 없음), SOS는 바로 모의 신고, 부표 시간 경보는 기록·알림만(단계는 앱 설정 기준). 부표는 Q·R·H 명령을 받지 않으므로 "괜찮으세요?" 확인에 해녀가 버튼으로 답할 수 없음. 원본은 SOS를 받으면 복귀 처리를 건너뛰어 계속 물속으로 알던 버그가 있어 순서를 바꿔 저장함.
 
 PC 연결은 Web Serial(크롬·엣지), 115200bps. **알려진 한계**: 물속 SOS는 올라와야 전달된다(설계상 "신호 없음 = 위험"으로 보완). 수신기에서 멀어져도 끊겨 물속으로 오판할 수 있다.
 

@@ -438,8 +438,10 @@ const nameOf = id => S.names[id] || `해녀 ${id}`;
 
 // 수신 형식: D,번호,온도,맥박,쓰러짐,무움직임초,SOS,신호세기
 // 응답 형식: A,번호  (해녀가 확인 신호에 버튼으로 답함)
+// 부표 마이크로비트(buoy_receiver_python.py)는 위 형식 대신 사건만 알림: "EVENT: DIVER SUBMERGED" 등 → buoyEvent
 function ingest(line){
   line=line.trim();
+  if(/^(EVENT|ALERT):/i.test(line)){ buoyEvent(line); return; }
   if(line.startsWith("A,")){ const id=parseInt(line.split(",")[1]); if(id>0) onAck(id); return; }
   if(!line.startsWith("D,")) return;
   const p=line.split(",");
@@ -461,6 +463,30 @@ function ingest(line){
   if(!d.sessionStart || now()-d.lastAt>15*60000) d.sessionStart=now()-(sim.on&&!d.lastAt?Math.round(rnd(5,25))*60000:0);
   d.last=pk; d.lastAt=now();
   d.hist.push(pk.bpm>0?pk.bpm:null); if(d.hist.length>60) d.hist.shift();
+}
+
+/* 부표 마이크로비트: 해녀 한 명(1번)의 입수·복귀·SOS만 알려 주고, 물 위에 있는 동안은 조용함.
+   그래서 물 위에 있는 동안은 앱이 1초마다 "물 위" 신호를 대신 넣어 기존 규칙(물속 시간·쉬는 시간·SOS)을 그대로 씀.
+   맥박·온도는 없으므로 비워 둠(NaN). 부표 자체의 잠수 시간 경보는 기록·알림만 하고, 단계 판단은 앱 설정 기준으로 함 */
+const BUOY_ID=1, BUOY_GAP=2000;   // 부표는 신호가 2초 끊기면 입수로 알려 줌
+const buoy={on:false, up:false, sosUntil:0, alerted:false};
+function buoyFeed(){ ingest(`D,${BUOY_ID},nan,nan,0,0,${now()<buoy.sosUntil?1:0}`); }
+function buoyEvent(line){
+  const t=line.toUpperCase();
+  if(!buoy.on){ buoy.on=true; log("부표 마이크로비트 신호를 받고 있어요 (입수·복귀를 알려 주는 방식, 해녀 1명)"); }
+  if(t.includes("SUBMERGED")){
+    const d=diver(BUOY_ID);
+    if(!d.lastAt) buoyFeed();                 // 처음 받은 신호면 카드부터 만들기
+    buoy.up=false; buoy.alerted=false;
+    d.lastAt=now()-BUOY_GAP;                  // 마지막 신호는 2초 전 → 물속 시간이 그때부터
+    log(`${nameOf(BUOY_ID)}: 물에 들어감 (부표 알림)`);
+  }else if(t.includes("RETURNED")){
+    buoy.up=true; buoyFeed();                 // 물 위 신호 → 잠수 시간 기록, 휴식 시작
+  }else if(t.includes("SOS")){
+    buoy.up=true; buoy.sosUntil=now()+15000; buoyFeed();   // SOS는 물 위에서 눌린 것 → 바로 신고 절차
+  }else if(t.includes("EXCEEDED")){
+    if(!buoy.alerted){ buoy.alerted=true; log(`${nameOf(BUOY_ID)}: 부표 경보 - 부표에 정한 잠수 시간을 넘음`); toast(`⚠ 부표 경보: ${nameOf(BUOY_ID)} 잠수 시간 초과`); beep(660,250,2); }
+  }
 }
 
 function evaluate(d){
@@ -552,6 +578,7 @@ $("divers").addEventListener("click",e=>{ const b=e.target.closest("[data-report
 /* ================= 주기 점검 ================= */
 function tick(){
   if(sim.on) simStep();
+  if(port && buoy.on && buoy.up) buoyFeed();   // 부표: 물 위에 있는 동안 "물 위" 신호를 대신 넣음
   for(const d of divers.values()){
     trackState(d);
     const {level,reasons}=evaluate(d); d.level=level; d.reasons=reasons;
@@ -673,7 +700,7 @@ function reportText(d,why){
 대상: ${nameOf(d.id)} (장비 번호 ${d.id})
 상황: ${d.reasons.join(", ")}
 비상 판단 근거: ${why}
-마지막 측정: 맥박 ${k.bpm>0?k.bpm+"회/분":"측정 안 됨"}, 착용부 온도 ${k.temp??"-"}℃, 무움직임 ${k.still??"-"}초, 마지막 신호 ${d.lastAt?Math.round((now()-d.lastAt)/1000):"-"}초 전
+마지막 측정: 맥박 ${k.bpm>0?k.bpm+"회/분":"측정 안 됨"}, 착용부 온도 ${Number.isFinite(k.temp)?k.temp+"℃":"측정 안 됨"}, 무움직임 ${k.still??"-"}초, 마지막 신호 ${d.lastAt?Math.round((now()-d.lastAt)/1000):"-"}초 전
 관리자 연락처: ${r.phone||"(미설정)"}
 ※ 해상 사고는 해양경찰 122, 구급은 119`;
 }
@@ -756,7 +783,7 @@ $("btnSerial").onclick=async()=>{
   try{
     port=await navigator.serial.requestPort();
     await port.open({baudRate:115200});
-    sim.on=false; $("simOn").checked=false; divers.clear();
+    sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false});
     setConn(); log("수신용 마이크로비트 연결됨"); readLoop();
   }catch(e){ port=null; setConn(); toast("연결하지 못했어요: "+(e.message||e)); }
 };
@@ -937,7 +964,7 @@ function setMode(){ $("agentMode").textContent=aiReady()?`Gemini · ${S.ai.model
 
 function diversStatus(){
   return [...divers.values()].sort((a,b)=>a.id-b.id).map(d=>({id:d.id,name:nameOf(d.id),level:LV[d.level],reasons:d.reasons,
-    bpm:d.last?.bpm>0?d.last.bpm:null,temp:d.last?.temp??null,still_sec:d.last?.still??null,
+    bpm:d.last?.bpm>0?d.last.bpm:null,temp:Number.isFinite(d.last?.temp)?d.last.temp:null,still_sec:d.last?.still??null,
     seconds_since_signal:d.lastAt?Math.round((now()-d.lastAt)/1000):null, dive_min:diveMinutes(d),
     state:d.lastAt?(d.under?"물질 중(물속)":"휴식 중(물 위)"):"신호 없음", under_sec:d.under?Math.round((now()-d.lastAt)/1000):0,
     rest_sec:!d.under&&d.surfacedAt?Math.round((now()-d.surfacedAt)/1000):0, dives:d.dives.length,
