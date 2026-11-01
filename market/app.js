@@ -110,7 +110,10 @@
     shop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h16l-1.5 11h-13z"/><path d="M8 9a4 4 0 0 1 8 0"/></svg>',
     user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>'
   };
-  const waves = '<svg class="waves" viewBox="0 0 400 46" preserveAspectRatio="none"><path d="M0 20 Q25 6 50 20 T100 20 T150 20 T200 20 T250 20 T300 20 T350 20 T400 20 V46 H0z" fill="#fff"/></svg>';
+  // 선으로 그린 물결 두 줄 (잡지 삽화 느낌)
+  const waves = '<svg class="waves" viewBox="0 0 400 36" preserveAspectRatio="none" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"><path vector-effect="non-scaling-stroke" d="M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 T250 10 T300 10 T350 10 T400 10"/><path vector-effect="non-scaling-stroke" d="M0 28 Q25 18 50 28 T100 28 T150 28 T200 28 T250 28 T300 28 T350 28 T400 28"/></g></svg>';
+  // 손님 표지 아래 삽화: 물결 위에 뜬 테왁
+  const coverArt = '<svg class="art" viewBox="0 0 340 46" preserveAspectRatio="xMaxYMid meet" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M0 30q14-9 28 0t28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0"/><path d="M14 41q14-9 28 0t28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0 28 0" opacity=".45"/></g><circle cx="292" cy="17" r="11" style="fill:var(--tewak)"/><path d="M281.6 15.2c6.9 2.4 13.9 2.4 20.8 0" stroke="#fbf8f2" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>';
 
   /* ---------- 공용 조각 ---------- */
   const isExample = (a) => /예시/.test((a && a.name) || '');
@@ -145,7 +148,7 @@
     </article>`;
   }
 
-  function postCard(p, owner) {
+  function postCard(p, owner, i) {
     const sp = SP[p.species];
     const sold = p.status === 'sold';
     const ownerBtns = `<div class="row">
@@ -159,8 +162,9 @@
     return `<article class="card ${sold ? 'sold' : ''} ${early ? 'match' : ''}">
       ${early ? `<div class="banner">📅 예약하신 ${esc(sp.ko)}${josa(sp.ko, '이', '가')} 올라왔어요! 다른 손님보다 먼저 보고 있어요. ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개돼요.</div>` : ''}
       ${owner && isEarly(p) ? `<div class="notice">예약 손님에게 먼저 보여주는 중 · ${minsLeft(p.earlyUntil)}분 뒤 모두에게 공개</div>` : ''}
+      <div class="post-h"><span class="no">No.${String((i || 0) + 1).padStart(2, '0')}</span><span class="by"><b>${esc(p.author.name)} 삼촌</b> · ${esc(p.author.village)}</span></div>
       ${p.photo ? `<img class="photo" src="${esc(p.photo)}" alt="${esc(sp.ko)} 사진">` : ''}
-      <div class="row between"><h2>${esc(A.label(p.species, p.variety))} <span class="muted small">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
+      <div class="post-t"><h2>${esc(A.label(p.species, p.variety))} <span class="muted">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
       <div class="kv">${(p.author && (p.author.region || A.regionOf(p.author.village))) ? `<span>${esc(regionName(p.author.region || A.regionOf(p.author.village)))}${A.isSpecial(p.author.region || A.regionOf(p.author.village), p.species) ? ' 특산' : ''}</span>` : ''}<span>${esc(ago(p.createdAt))} 올림</span><span>양 <b>${kg(p.weightKg)}</b></span>${p.example ? '<span class="pill info">예시 글</span>' : ''}</div>
       ${p.promo ? `<p class="promo">${esc(p.promo)}</p>` : ''}
       <div class="row between" style="align-items:flex-end">
@@ -261,7 +265,7 @@
     const mine = S.posts.filter((p) => p.ownerId === DEV);
     return `<h1>내가 올린 글</h1>
       <p class="muted" style="margin:0">다 팔리면 '다 팔렸어요'를 눌러 주세요. 손님이 헛걸음하지 않아요.</p>
-      ${mine.length ? mine.map((p) => postCard(p, true)).join('') : '<div class="empty">아직 올린 글이 없어요. 올리기에서 사진을 찍어 보세요.</div>'}
+      ${mine.length ? mine.map((p, i) => postCard(p, true, i)).join('') : '<div class="empty">아직 올린 글이 없어요. 올리기에서 사진을 찍어 보세요.</div>'}
       <button type="button" class="btn sm" data-act="reset">게시판을 예시 글로 되돌리기</button>`;
   }
 
@@ -317,19 +321,21 @@
         : `<button type="button" class="sp-chip" data-act="sp-resv" data-v="${esc(A.label(k, v))}"><b>${esc(A.label(k, v))}</b><span>📅 예약</span></button>`;
     }).join('');
     const arrived = myWants().filter((w) => w.matchedPostId).length;
+    const today = new Date(), mmdd = String(today.getMonth() + 1).padStart(2, '0') + '.' + String(today.getDate()).padStart(2, '0');
     return `<section class="hero">
-        <div class="row between" style="align-items:flex-start;flex-wrap:nowrap">
-          <div class="stack" style="gap:8px"><div class="eyebrow">${esc(regionName(R))} 해녀가 직접 알려요</div><h1>오늘 바다에서<br><em>막 올라온</em> 해산물</h1></div>
+        <div class="row between" style="align-items:center;flex-wrap:nowrap">
+          <div class="issue"><i>${mmdd}</i>${esc(regionName(R))} 해녀가 직접 알려요</div>
           <button type="button" class="cal-btn" data-act="open-resv" aria-label="먼저 보기 예약${myWants().length ? ', 예약 ' + myWants().length + '개' : ''}" title="먼저 보기 예약"><span aria-hidden="true">📅</span>${arrived ? `<span class="badge num">${arrived}</span>` : myWants().length ? '<i class="cal-dot"></i>' : ''}</button>
         </div>
+        <h1>오늘,<br>바다에서<br><em>왔습니다.</em></h1>
+        <p class="lede">해녀 삼촌이 숨 참고 따 온 해산물을 사진 그대로 알려 드려요. 사고파는 건 삼촌에게 전화나 문자로 직접 하세요.</p>
         <div class="trust"><span>수수료 <b>0원</b></span><span>해녀와 직접 거래</span><span>오늘 물질한 것</span></div>
-        <p class="small" style="margin:0;opacity:.82">해녀바당은 알리기만 도와요. 사고파는 건 해녀에게 전화나 문자로 직접 하세요.</p>
-        ${waves.replace('class="waves"', 'class="waves back"')}${waves}
+        ${coverArt}
       </section>
       <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
       <section class="card special"><div class="eyebrow">★ ${esc(regionName(R))} 특산품 추천</div><div class="sp-grid">${specials}</div><p class="muted small" style="margin:0">있는 건 눌러서 보고, 없는 건 예약해 두면 올라올 때 먼저 보여 드려요.</p></section>
       <div class="chips"><button type="button" class="chip" data-act="filter" data-v="all" aria-pressed="${ui.filter === 'all'}">전체</button>${kinds.map((k) => `<button type="button" class="chip" data-act="filter" data-v="${k}" aria-pressed="${ui.filter === k}">${esc(SP[k].ko)}</button>`).join('')}</div>
-      ${list.length ? list.map((p) => (isEarly(p) && !canSeeEarly(p) ? teaser(p) : postCard(p, false))).join('') : '<div class="empty">아직 올라온 해산물이 없어요. 물질 끝나는 오후에 다시 봐 주세요.</div>'}`;
+      ${list.length ? list.map((p, i) => (isEarly(p) && !canSeeEarly(p) ? teaser(p) : postCard(p, false, i))).join('') : '<div class="empty">아직 올라온 해산물이 없어요. 물질 끝나는 오후에 다시 봐 주세요.</div>'}`;
   }
 
   /* ---------- 손님: 먼저 보기 예약 ---------- */
