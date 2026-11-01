@@ -5,7 +5,9 @@
 #   EVENT: DIVER SUBMERGED              → 물질 중(물속)으로 바뀜
 #   EVENT: DIVER RETURNED TO SURFACE    → 휴식 중(물 위), 잠수 시간 기록
 #   ALERT: EMERGENCY SOS BUTTON ...     → SOS, 확인 없이 바로 모의 신고
-#   ALERT: EMERGENCY DIVER TIME EXCEEDED → 부표 경보로 기록·알림 (단계 판단은 웹앱 설정 기준)
+#   ALERT: DIVER WARN 90S               → 물속 90초, 주의
+#   ALERT: DIVER DANGER 150S            → 물속 150초, 위험
+#   ALERT: DIVER CRITICAL 210S          → 물속 210초, 위급
 #   INFO: RX 5 RSSI -55 GAP 1000        → 진단: 5초 동안 받은 신호 수, 신호 세기, 가장 길게 끊긴 시간(ms)
 # 해녀 마이크로비트(buoy_sender_python.py): 라디오 그룹 1, 물 위에서 0.3초마다 1을 보내고, SOS는 99
 #   → 정상이면 진단 줄 RX가 5초에 15번 정도
@@ -16,12 +18,16 @@
 #   2) 2초 기준은 해녀용이 1초마다 보낼 때 한 번만 놓쳐도 "입수"가 됨 → 3초로 늘림
 
 GAP_MS = 3000   # 신호가 이만큼 끊기면 입수로 봄
+# 물속 시간 경보 3단계 (초) — 웹앱 설정의 기본값과 같음
+WARN_S = 90      # 주의
+DANGER_S = 150   # 위험
+CRIT_S = 210     # 위급
 
 is_diver_submerged = False
 dive_start_time = 0
 last_diver_signal_time = 0
-last_alert_time = 0
-show = 0        # 보여 줄 그림: 0 없음, 1 복귀(웃는 얼굴), 2 SOS, 3 시간 초과
+stage = 0       # 이번 잠수에서 알린 단계: 0 없음, 1 주의, 2 위험, 3 위급
+show = 0        # 보여 줄 그림: 0 없음, 1 복귀(웃는 얼굴), 2 SOS, 3 주의, 4 위험, 5 위급
 packets = 0     # 진단용: 최근 5초 동안 받은 신호 수
 last_rssi = 0
 max_gap = 0
@@ -30,7 +36,7 @@ last_info_time = 0
 radio.set_group(1)
 
 def on_forever():
-    global is_diver_submerged, dive_start_time, last_alert_time, show
+    global is_diver_submerged, dive_start_time, stage, show
     global packets, max_gap, last_info_time
     current_time = input.running_time()
 
@@ -39,16 +45,25 @@ def on_forever():
         if (current_time - last_diver_signal_time) > GAP_MS:
             if is_diver_submerged == False:
                 is_diver_submerged = True
-                dive_start_time = current_time
+                dive_start_time = last_diver_signal_time   # 마지막 신호 때부터 물속
+                stage = 0
                 serial.write_line("EVENT: DIVER SUBMERGED")
 
-    # 10초 잠수 제한시간 초과 시 부표에서 알림 출력 (시연용 10초. 웹앱의 단계 기준은 설정에서 따로 정함)
+    # 물속 시간 경보: 90초 주의 → 150초 위험 → 210초 위급 (단계마다 한 번씩 알림)
     if is_diver_submerged == True:
-        if (current_time - dive_start_time) > 10000:
-            if (current_time - last_alert_time) > 3000:
-                last_alert_time = current_time
-                serial.write_line("ALERT: EMERGENCY DIVER TIME EXCEEDED")
-                show = 3
+        under_s = (current_time - dive_start_time) / 1000
+        if under_s >= CRIT_S and stage < 3:
+            stage = 3
+            serial.write_line("ALERT: DIVER CRITICAL " + str(CRIT_S) + "S")
+            show = 5
+        elif under_s >= DANGER_S and stage < 2:
+            stage = 2
+            serial.write_line("ALERT: DIVER DANGER " + str(DANGER_S) + "S")
+            show = 4
+        elif under_s >= WARN_S and stage < 1:
+            stage = 1
+            serial.write_line("ALERT: DIVER WARN " + str(WARN_S) + "S")
+            show = 3
 
     # 5초마다 진단 줄: 받은 신호 수·세기·가장 길게 끊긴 시간
     if (current_time - last_info_time) >= 5000:
@@ -72,9 +87,18 @@ def on_forever_screen():
         show = 0
         basic.show_icon(IconNames.HAPPY)
         basic.clear_screen()
-    elif show == 3:
+    elif show == 3:     # 주의: 놀란 얼굴
+        show = 0
+        basic.show_icon(IconNames.SURPRISED)
+        basic.clear_screen()
+    elif show == 4:     # 위험: X
         show = 0
         basic.show_icon(IconNames.NO)
+        basic.clear_screen()
+    elif show == 5:     # 위급: 해골 + 소리
+        show = 0
+        basic.show_icon(IconNames.SKULL)
+        music.play_tone(988, 500)
         basic.clear_screen()
     else:
         basic.pause(50)

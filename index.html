@@ -492,7 +492,7 @@ function buoyEvent(line){
       log(`부표 진단: 신호가 ${(buoy.info.gap/1000).toFixed(1)}초 끊겼다 다시 잡힘 (세기 ${buoy.info.rssi}, 5초에 ${buoy.info.rx}번 받음)`);
     return;
   }
-  buoy.last={at:now(), what:t.includes("SUBMERGED")?"물에 들어감":t.includes("RETURNED")?"물 위로 올라옴":t.includes("SOS")?"SOS":t.includes("EXCEEDED")?"잠수 시간 초과":line.slice(0,30)};
+  buoy.last={at:now(), what:t.includes("SUBMERGED")?"물에 들어감":t.includes("RETURNED")?"물 위로 올라옴":t.includes("SOS")?"SOS":t.includes("CRITICAL")?"물속 위급":t.includes("DANGER")?"물속 위험":t.includes("WARN")?"물속 주의":t.includes("EXCEEDED")?"잠수 시간 초과":line.slice(0,30)};
   if(t.includes("SUBMERGED")){
     const d=diver(BUOY_ID);
     if(!d.lastAt) buoyFeed();                 // 처음 받은 신호면 카드부터 만들기
@@ -503,6 +503,11 @@ function buoyEvent(line){
     buoy.up=true; buoyFeed();                 // 물 위 신호 → 잠수 시간 기록, 휴식 시작
   }else if(t.includes("SOS")){
     buoy.up=true; buoy.sosUntil=now()+15000; buoyFeed();   // SOS는 물 위에서 눌린 것 → 바로 신고 절차
+  }else if(/CRITICAL|DANGER|WARN/.test(t)){
+    // 부표의 물속 시간 3단계 (주의 90초 · 위험 150초 · 위급 210초). 단계 판단·신고 절차는 앱 설정 기준으로 따로 돌아감
+    const k=t.includes("CRITICAL")?"위급":t.includes("DANGER")?"위험":"주의", sec=(t.match(/(\d+)S/)||[])[1];
+    log(`${nameOf(BUOY_ID)}: 부표 경보 - 물속 ${sec?sec+"초":"시간"} ${k}`);
+    if(k!=="위급") toast(`⚠ 부표 경보: ${nameOf(BUOY_ID)} 물속 ${sec?sec+"초 ":""}${k}`);
   }else if(t.includes("EXCEEDED")){
     if(!buoy.alerted){ buoy.alerted=true; log(`${nameOf(BUOY_ID)}: 부표 경보 - 부표에 정한 잠수 시간을 넘음`); toast(`⚠ 부표 경보: ${nameOf(BUOY_ID)} 잠수 시간 초과`); beep(660,250,2); }
   }
