@@ -11,6 +11,9 @@
     },
     "api/region.js": {
       "maxDuration": 30
+    },
+    "api/moderate.js": {
+      "maxDuration": 30
     }
   }
 }

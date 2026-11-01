@@ -148,7 +148,7 @@
     gulfweed: '몸국 끓이기 딱 좋아요',
     ecklonia: '쌉싸름한 향이 좋아 무침으로 그만이에요'
   };
-  function promo({ species, variety, grade, freshness, weightKg, author }, variant) {
+  function promo({ species, variety, grade, freshness, weightKg, author, locker: box }, variant) {
     const ko = label(species, variety);
     const name = author && author.name ? author.name.replace(/\(예시\)/, '').trim() : '';
     const who = name ? name + ' 해녀' : '해녀';
@@ -158,7 +158,9 @@
     const top = grade === '특' ? '큰 놈들로만 골랐어요' : grade === '상' ? '알 좋은 걸로 골랐어요' : '집에서 편하게 드시기 좋은 크기예요';
     const where = author && author.place ? author.place : '';
     const when = author && author.hours ? author.hours : '';
-    const pickup = where || when ? `\n📍 ${[where, when].filter(Boolean).join(' · ')}` : '';
+    const lk = box && LOCKERS.find((l) => l.id === box.id);
+    const pickup = lk ? `\n🧊 ${lk.name} 무인 냉장고(${lk.place})에서 비밀번호로 가져가세요`
+      : where || when ? `\n📍 ${[where, when].filter(Boolean).join(' · ')}` : '';
     const v = [
       `【오늘 ${sea}에서 막 올라온 ${ko}】\n${who}가 숨 참고 한 개 한 개 따 온 ${ko}${josa(ko, '이에요', '예요')}. ${alive}. ${taste}.\n오늘 들어온 건 ${weightKg}kg뿐이에요. 다 나가면 다음 물질 때까지 없어요.${pickup}`,
       `【양식 아니고, 해녀가 직접 땄어요】\n${sea} ${ko}, ${top}. ${taste}.\n중간 상인 없이 바다에서 바로 식탁으로 가요. 먼저 연락 주시는 분께 드려요.${pickup}`,
@@ -231,25 +233,78 @@
   const itemFactor = (region, species) => (ITEM_INDEX[species] || {})[region] || null;
   const regionFactor = (region, species) => itemFactor(region, species) || REGION_INDEX[region] || 1;
 
+  /* ---------- 무인 냉장고: 만나지 않고 주고받기 ---------- */
+  // 해녀가 냉장고 칸에 넣고 자물쇠를 잠근 뒤, 비밀번호는 산 손님에게만 문자로 보냄 (해녀 신변 보호)
+  // 위치는 시연용 예시(아직 설치 전). 좌표는 항구·어촌계 근처 대략값이라 설치하면 실제 값으로 바꿔야 함
+  const LOCKERS = [
+    { id: 'jeju-1', name: '제주-1', region: 'jeju', place: '구좌읍 하도리 해녀박물관 근처', at: [33.5232, 126.8625], slots: 6 },
+    { id: 'jeju-2', name: '제주-2', region: 'jeju', place: '구좌읍 종달리 포구 근처', at: [33.4987, 126.9033], slots: 6 },
+    { id: 'jeju-3', name: '제주-3', region: 'jeju', place: '서귀포 법환포구 근처', at: [33.2357, 126.5145], slots: 4 },
+    { id: 'busan-1', name: '부산-1', region: 'busan', place: '기장 대변항 근처', at: [35.2227, 129.2299], slots: 4 },
+    { id: 'ulsan-1', name: '울산-1', region: 'ulsan', place: '북구 정자항 근처', at: [35.6219, 129.4519], slots: 4 },
+    { id: 'gyeongbuk-1', name: '경북-1', region: 'gyeongbuk', place: '포항 구룡포항 근처', at: [35.9896, 129.5566], slots: 4 },
+    { id: 'gangwon-1', name: '강원-1', region: 'gangwon', place: '속초 동명항 근처', at: [38.2105, 128.6006], slots: 4 },
+    { id: 'gyeongnam-1', name: '경남-1', region: 'gyeongnam', place: '거제 지세포항 근처', at: [34.8318, 128.7116], slots: 4 },
+    { id: 'jeonnam-1', name: '전남-1', region: 'jeonnam', place: '완도항 근처', at: [34.3110, 126.7550], slots: 4 },
+    { id: 'chungnam-1', name: '충남-1', region: 'chungnam', place: '태안 신진도항 근처', at: [36.6774, 126.1347], slots: 4 }
+  ];
+  const locker = (id) => LOCKERS.find((l) => l.id === id) || null;
+  const lockersIn = (region) => LOCKERS.filter((l) => l.region === region);
+  // 길찾기: 카카오맵(앱이 있으면 앱으로 열림), 구글 지도
+  const navLinks = (l) => ({
+    kakao: `https://map.kakao.com/link/to/${encodeURIComponent(l.name + ' 해녀바당 냉장고')},${l.at[0]},${l.at[1]}`,
+    google: `https://www.google.com/maps/dir/?api=1&destination=${l.at[0]},${l.at[1]}`
+  });
+  const newPin = () => String(Math.floor(1000 + Math.random() * 9000));
+
+  /* ---------- 후기 검사: 욕설·일방적 비방 거르기 ---------- */
+  // 1차는 여기 규칙(욕설·비하·근거 없는 범죄 단정), 2차는 서버 AI(/api/moderate)가 문맥을 봄.
+  // 맛·양·신선도·응대에 대한 불만이나 낮은 별점 같은 정당한 비판은 막지 않는다.
+  // 띄어쓰기·기호를 넣어 피해 가는 것(씨.발)까지 잡는 센 욕설은 기호를 뺀 글에서도 찾고,
+  // 뜻이 여럿인 말은 원래 글에서만 찾음 ("불이 꺼져", "죽여주는 맛", "새우에 미역" 같은 오해 방지)
+  const STRONG = [/씨발|시발|ㅅㅂ|ㅆㅂ|쉬발|씨빨|시빨/, /병신|ㅂㅅ|븅신|빙신/, /개새(끼|기|키)|개색(끼|기)|ㄱㅅㄲ/, /좆|존나|ㅈㄴ|ㅈ같/, /지랄|ㅈㄹ/];
+  const BAD_WORDS = [/졸라/, /미친\s*(년|놈|것|새끼)|ㅁㅊ/, /닥쳐|엿\s*먹/, /니\s*애미|느금/, /틀딱|노인네|할망구|할매년/, /썅|쌍놈|쌍년|화냥/];
+  const SLANDER = [/사기\s*(꾼|치|쳐|친|당했)/, /도둑\s*(년|놈|질|이네|같)/, /양아치/, /쓰레기\s*(같|년|놈)/, /망해라|망해\s*버려|문\s*닫아라/, /죽어라|뒤져라/, /(장사|팔지)\s*(하지\s*)?마라/];
+  const flat = (t) => String(t || '').replace(/[\s.,·_\-~!?*^'"`]+/g, '');
+  function checkReview(text) {
+    const t = String(text || ''), f = flat(t);
+    if (STRONG.some((re) => re.test(f)) || BAD_WORDS.some((re) => re.test(t))) return { ok: false, kind: '욕설', reason: '욕설이나 사람을 낮춰 부르는 말이 들어 있어요.' };
+    if (SLANDER.some((re) => re.test(t))) return { ok: false, kind: '비방', reason: '근거 없이 사람을 범죄자로 몰거나 망하라고 하는 말이 들어 있어요.' };
+    return { ok: true };
+  }
+  // 후기에 남긴 전화번호는 가림 (개인정보)
+  const maskPhone = (t) => String(t || '').replace(/(01[016789])[-\s.]?\d{3,4}[-\s.]?(\d{4})/g, '$1-****-$2');
+
   const EXAMPLE_ME = { name: '김순덕(예시)', village: '하도 어촌계', region: 'jeju', phone: '010-0000-0000', place: '하도 어촌계 해녀 판매장', hours: '물질 끝나고 오후 3~5시' };
 
+  const digitsOf = (p) => String(p || '').replace(/[^\d]/g, '');
   function seed() {
     const now = Date.now();
     const h = (n) => iso(now - n * 3600 * 1000);
     const a1 = Object.assign({}, EXAMPLE_ME);
     const a2 = { name: '고옥자(예시)', village: '종달 어촌계', region: 'jeju', phone: '010-0000-0001', place: '종달리 포구 앞', hours: '오전 11시~오후 2시' };
-    const mk = (author, species, grade, freshness, weightKg, ask, hrs, status) => ({
-      id: uid('p'), ownerId: 'seed', example: true, author, species, grade, freshness, weightKg,
-      refPerKg: refPrice({ species, grade, freshness }), askPerKg: ask, photo: null,
-      promo: promo({ species, grade, freshness, weightKg, author }, hrs), createdAt: h(hrs), status: status || 'open'
-    });
+    const mk = (author, species, grade, freshness, weightKg, ask, hrs, status, box) => {
+      const locker = box ? { id: box[0], slot: box[1] } : null;
+      return {
+        id: uid('p'), ownerId: 'seed', example: true, author, species, grade, freshness, weightKg,
+        refPerKg: refPrice({ species, grade, freshness }), askPerKg: ask, photo: null,
+        promo: promo({ species, grade, freshness, weightKg, author, locker }, hrs), createdAt: h(hrs), status: status || 'open', locker
+      };
+    };
+    const posts = [
+      mk(a1, 'abalone', '특', '최상', 3, 45000, 1, null, ['jeju-1', 2]),
+      mk(a2, 'turban', '상', '좋음', 5, 13000, 2, null, ['jeju-2', 1]),
+      mk(a1, 'seaweed', '상', '좋음', 4, null, 5, null, ['jeju-1', 4]),
+      mk(a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold', ['jeju-2', 3])
+    ];
+    const rv = (post, stars, text, name, hrs) => ({ id: uid('r'), ownerId: 'seed', example: true, postId: post.id, seller: digitsOf(post.author.phone), species: post.species, stars, text, name, createdAt: h(hrs), checked: 'rule' });
     return {
       v: 2,
-      posts: [
-        mk(a1, 'abalone', '특', '최상', 3, 45000, 1),
-        mk(a2, 'turban', '상', '좋음', 5, 13000, 2),
-        mk(a1, 'seaweed', '상', '좋음', 4, null, 5),
-        mk(a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold')
+      posts,
+      reviews: [
+        rv(posts[0], 5, '전복이 정말 커요. 냉장고에서 바로 찾아서 기다릴 필요가 없었어요.', '정하늘(예시)', 0.5),
+        rv(posts[0], 4, '맛은 좋았는데 생각보다 작은 게 두어 개 섞여 있었어요.', '윤서(예시)', 0.8),
+        rv(posts[3], 5, '살짝 데쳐 먹었는데 부드럽고 달아요. 길찾기로 냉장고도 금방 찾았어요.', '민준(예시)', 20)
       ],
       wants: [
         { id: 'w-seed1', ownerId: 'seed', example: true, name: '박지은(예시)', phone: '010-0000-0002', text: '성게알 0.5kg 정도, 주말에 받고 싶어요', species: ['urchinroe'], createdAt: h(20), matchedPostId: null },
@@ -262,7 +317,8 @@
     };
   }
 
-  const api = { REGIONS, regionOf, nearestRegion, isSpecial, setRegionIndex, regionFactor, regionNote, label, VARIETIES, detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET };
+  const api = { REGIONS, regionOf, nearestRegion, isSpecial, setRegionIndex, regionFactor, regionNote, label, VARIETIES, detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET,
+    LOCKERS, locker, lockersIn, navLinks, newPin, checkReview, maskPhone, digitsOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);
