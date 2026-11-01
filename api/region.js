@@ -94,7 +94,12 @@ module.exports = async (req, res) => {
       if (OP === null) return res.status(502).json({ error: "지역별 가격 API 주소를 찾지 못했어요", log });
     }
     // 3) 품목마다 지역별 가격을 받아 "지역 가격 ÷ 전국 중앙값" 비율을 모음
-    let results = await Promise.all(codes.map((c) => get(base0 + OP, key, params(c)).then((r) => ({ c, ...r }))));
+    // perRegion은 2026-11-01까지 어떤 조건(조건 없음 포함)에도 0건 → 첫 품목으로 한 번만 보고, 비었으면 나머지는 부르지 않음
+    const first = await get(base0 + OP, key, params(codes[0]));
+    log.push({ 단계: "perRegion 확인", 품목코드: codes[0], status: first.status, 건수: first.items.length });
+    let results = first.items.length
+      ? [{ c: codes[0], ...first }, ...(await Promise.all(codes.slice(1).map((c) => get(base0 + OP, key, params(c)).then((r) => ({ c, ...r })))))]
+      : [{ c: codes[0], ...first }];
     let source = "perRegion";
     // perRegion에 자료가 없으면 같은 기관의 「일별 도·소매 가격정보」(perDay)로: 시군구별 가격을 함께 줌
     if (!results.some((r) => r.items.length)) {
