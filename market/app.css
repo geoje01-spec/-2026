@@ -319,9 +319,13 @@ textarea { min-height: 110px; border: 1px solid var(--rule); border-bottom: 2px 
 .banner.mod b { color: var(--warn); }
 .suggest { margin: 8px 0; padding: 8px 10px; background: var(--paper-2); border-left: 3px solid var(--ok); font-family: var(--serif); }
 
-/* 로그인·회원가입 */
-.auth-page::after { bottom: 0; }
-main.auth { max-width: 440px; padding-block: 28px 90px; gap: 20px; }
+/* 로그인·회원가입: 해녀바당 페이지 안에 있고, 로그인 안 돼 있을 때(html.signed-out)만 보임 */
+main.auth { display: none; max-width: 440px; padding-block: 28px 90px; gap: 20px; }
+.signed-out main.auth { display: flex; }
+.signed-out .top, .signed-out #view, .signed-out .tabs { display: none; }
+.signed-out body::after { bottom: 0; }
+.auth-view { display: flex; flex-direction: column; gap: 20px; }
+.link { border: 0; background: none; padding: 0; font: inherit; color: var(--tewak); font-weight: 700; text-decoration: underline; cursor: pointer; }
 .auth-brand { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-weight: 800; font-size: 26px; letter-spacing: -0.02em; line-height: 1; padding-bottom: 14px; border-bottom: 1px solid var(--ink); box-shadow: 0 3px 0 -2px var(--ink); }
 .auth-brand .logo { width: 36px; height: 36px; flex: none; color: var(--ink); }
 .auth-brand small { display: block; font-family: var(--latin); font-style: italic; font-weight: 600; font-size: 14px; color: var(--sea); margin-top: 4px; letter-spacing: .04em; }

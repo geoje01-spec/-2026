@@ -22,7 +22,7 @@
 
   /* ---------- 로그인: 해녀 계정은 해녀 화면, 일반 계정은 손님 화면 ---------- */
   const SESSION = store.get('haenyeo_session', null);
-  if (!SESSION || !SESSION.username) { location.replace('/market/login.html'); return; }
+  if (!SESSION || !SESSION.username) return;   // 로그인 화면(auth.js)이 대신 보임
   const IS_HAENYEO = SESSION.userType === 'haenyeo';
 
   /* ---------- 데이터: 공유 게시판(서버) 또는 이 기기 ---------- */
@@ -683,7 +683,7 @@
     const b = e.target.closest('[data-act]'); if (!b) return;
     const act = b.dataset.act, v = b.dataset.v, d = ui.draft;
     switch (act) {
-      case 'logout': try { localStorage.removeItem('haenyeo_session'); } catch { /* 저장 안 되는 환경 */ } location.replace('/market/login.html'); break;
+      case 'logout': try { localStorage.removeItem('haenyeo_session'); } catch { /* 저장 안 되는 환경 */ } location.reload(); break;
       case 'tab': ui.tab[ui.role] = v; ui.delArm = null; render(); window.scrollTo(0, 0); break;
       case 'filter': ui.filter = v; render(); break;
       case 'copy': copy(v, '전화번호를 복사했어요.'); break;
