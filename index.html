@@ -443,9 +443,10 @@ function ingest(line){
   line=line.trim();
   if(/^(EVENT|ALERT):/i.test(line)){ buoyEvent(line); return; }
   if(line.startsWith("A,")){ const id=parseInt(line.split(",")[1]); if(id>0) onAck(id); return; }
-  if(!line.startsWith("D,")) return;
+  // "D," 없이 해녀용 형식(번호,온도,맥박,쓰러짐,무움직임초,SOS)만 온 줄도 받아 줌
+  if(/^\d+(,-?[\d.]+){5,6}$/.test(line)) line="D,"+line;
   const p=line.split(",");
-  if(p.length<7) return;
+  if(!line.startsWith("D,") || p.length<7){ serialOdd(line); return; }
   const id=parseInt(p[1]); if(!(id>0)) return;
   const pk={temp:+p[2], bpm:+p[3], fall:+p[4], still:+p[5], sos:+p[6], rssi:p[7]!==undefined?+p[7]:null};
   const d=diver(id);
@@ -588,6 +589,7 @@ $("divers").addEventListener("click",e=>{ const b=e.target.closest("[data-report
 function tick(){
   if(sim.on) simStep();
   if(port && buoy.on && buoy.up) buoyFeed();   // 부표: 물 위에 있는 동안 "물 위" 신호를 대신 넣음
+  connInfo();
   if(port && buoy.last) $("connText").textContent=`부표 연결됨 · ${buoy.last.what} ${fmtSec(Math.round((now()-buoy.last.at)/1000))} 전`;
   for(const d of divers.values()){
     trackState(d);
@@ -781,6 +783,21 @@ function simStep(){
 
 /* ================= 마이크로비트 (Web Serial) ================= */
 let port=null, reading=false;
+// 진단: USB로 받은 줄 수와 마지막 줄을 연결 표시에 보여 줌 (신호는 오는데 화면이 안 바뀔 때 원인 찾기)
+const rx={n:0, last:"", at:0, odd:0, since:0};
+function serialOdd(line){
+  if(!port || !line) return;
+  rx.odd++;
+  if(rx.odd<=5) log(`알아보지 못한 줄: "${line.slice(0,40)}" (숨비 형식은 D,번호,온도,… 로 시작해야 해요)`);
+  if(rx.odd===5) log("알아보지 못한 줄이 계속 와요. 수신용 마이크로비트에 receiver_makecode.ts를 넣었는지 확인해 주세요.");
+}
+function connInfo(){
+  if(!port || buoy.last) return;
+  const s=Math.round((now()-(rx.at||rx.since))/1000);
+  $("connText").textContent = rx.n
+    ? `마이크로비트 연결됨 · 받은 줄 ${rx.n}개 · 마지막 ${s}초 전 "${rx.last.slice(0,24)}"`
+    : `마이크로비트 연결됨 · 받은 줄 0개 (${s}초째)${s>=5?" — 메이크코드 창을 닫고 다시 연결해 보세요":""}`;
+}
 function setConn(){
   const dot=$("connDot"), txt=$("connText");
   dot.className="dot"+(port?" on":(sim.on?" sim":""));
@@ -793,7 +810,7 @@ $("btnSerial").onclick=async()=>{
   try{
     port=await navigator.serial.requestPort();
     await port.open({baudRate:115200});
-    sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false});
+    sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now()});
     setConn(); log("수신용 마이크로비트 연결됨"); readLoop();
   }catch(e){ port=null; setConn(); toast("연결하지 못했어요: "+(e.message||e)); }
 };
@@ -802,7 +819,7 @@ async function readLoop(){
   while(port && port.readable && reading){
     const reader=port.readable.getReader();
     try{ while(reading){ const {value,done}=await reader.read(); if(done) break;
-        buf+=dec.decode(value,{stream:true}); let i; while((i=buf.indexOf("\n"))>=0){ ingest(buf.slice(0,i)); buf=buf.slice(i+1); } } }
+        buf+=dec.decode(value,{stream:true}); let i; while((i=buf.indexOf("\n"))>=0){ const ln=buf.slice(0,i).trim(); buf=buf.slice(i+1); if(!ln) continue; rx.n++; rx.last=ln; rx.at=now(); ingest(ln); } } }
     catch(e){ log("수신 오류: "+(e.message||e)); }
     finally{ reader.releaseLock(); }
   }
