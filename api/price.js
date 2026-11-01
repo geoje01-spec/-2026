@@ -49,10 +49,12 @@ function normalize(it) {
   };
 }
 // 단위가 kg·g일 때만 kg당 가격으로 씀 (마리·개 단위는 kg으로 바꿀 수 없음)
+// g 단위는 환산가가 이미 kg당 값이라(깐홍합 100g 조사가 2,800원 → 환산가 28,000원) 조사가 ÷ 단위 크기로 직접 계산
 function withKg(r) {
   const u = String(r.unit || "").trim().toLowerCase();
-  if (r.perUnit && u === "kg") r.perKg = r.perUnit;
-  else if (r.perUnit && u === "g") r.perKg = Math.round(r.perUnit * 1000);
+  const sz = num(r.size);
+  if (u === "kg") r.perKg = r.price && sz ? Math.round(r.price / sz) : r.perUnit;
+  else if (u === "g") r.perKg = r.price && sz ? Math.round(r.price * 1000 / sz) : r.perUnit;
   return r;
 }
 async function call(key, extra, op) {

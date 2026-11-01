@@ -6,6 +6,8 @@ const KEY_REGIONS = {
   gangwon: ["강릉", "춘천", "원주", "강원", "속초", "삼척"], gyeongnam: ["창원", "진주", "통영", "거제", "경남", "김해"],
   jeonnam: ["순천", "목포", "여수", "전남", "광주"], chungnam: ["천안", "서산", "충남", "대전", "보령"],
 };
+// 일별 시세에 있는 해녀 품목: 전복·굴·홍합 (2026-11-01 확인). 품목별 지역 계수도 따로 계산
+const HAENYEO_CODES = ["653", "644", "658"];
 const OPS = ["/price", "/prices", "/list", ""];
 let cache = { at: 0, data: null };
 let OP = null;
@@ -72,7 +74,8 @@ module.exports = async (req, res) => {
   try {
     // 1) 최근 수산물 시세에서 품목 코드와 조사일을 얻음
     const rec = await get("https://apis.data.go.kr/B552845/recent/price", key, { "cond[ctgry_cd::EQ]": "600" });
-    const codes = [...new Set(rec.items.map((it) => pick(it, /^item_cd$/i)).filter(Boolean))].slice(0, 10);
+    const recentCodes = [...new Set(rec.items.map((it) => pick(it, /^item_cd$/i)).filter(Boolean))].slice(0, 10);
+    const codes = recentCodes.length ? [...new Set([...recentCodes, ...HAENYEO_CODES])] : [];
     const day = String(pick(rec.items[0] || {}, /exmn_ymd/i) || "").replace(/-/g, "");
     log.push({ 단계: "최근 시세", status: rec.status, 품목코드: codes, 조사일: day });
     if (!codes.length || !/^\d{8}$/.test(day)) return res.status(502).json({ error: "최근 시세에서 품목 코드를 얻지 못했어요", log });
@@ -99,11 +102,12 @@ module.exports = async (req, res) => {
       log.push({ 단계: "perDay로 대신 조회", 결과: alt.map((r) => ({ 품목코드: r.c, status: r.status, 건수: r.items.length, 응답: r.items.length ? undefined : r.text.slice(0, 160) })) });
       if (alt.some((r) => r.items.length)) { results = alt; source = "perDay"; }
     }
-    const ratios = {};
+    const ratios = {}, itemRatios = {}, itemNames = {};
     let sample = null, rows = 0;
     for (const r of results) {
       if (!r.items.length) { if (log.length < 8) log.push({ 품목코드: r.c, status: r.status, 응답: r.text.slice(0, 200) }); continue; }
       sample = sample || r.items.slice(0, 3);
+      itemNames[r.c] = pick(r.items[0], /^item_nm$/i);
       // 소매 위주로, 같은 단위끼리 비교
       const all = r.items.map((it) => ({ se: String(pick(it, /se_nm/i) || ""), sgg: pick(it, /sgg_nm/i) || pick(it, /mrkt_nm/i), unit: pick(it, /^unit$/i), vr: pick(it, /vrty_cd/i), gr: pick(it, /grd_cd/i), ymd: String(pick(it, /exmn_ymd/i) || ""), p: price(it) })).filter((x) => x.p && x.sgg);
       // 같은 지역·구분·품종·등급·단위는 가장 최근 조사일 값 하나만
@@ -119,12 +123,26 @@ module.exports = async (req, res) => {
         if (g.length < 3) continue;
         const nat = median(g.map((x) => x.p));
         rows += g.length;
-        for (const x of g) { const k = regionOf(x.sgg); if (k) (ratios[k] = ratios[k] || []).push(x.p / nat); }
+        for (const x of g) {
+          const k = regionOf(x.sgg); if (!k) continue;
+          (ratios[k] = ratios[k] || []).push(x.p / nat);
+          const ir = (itemRatios[r.c] = itemRatios[r.c] || {});
+          (ir[k] = ir[k] || []).push(x.p / nat);
+        }
       }
     }
+    const round2 = (a) => Math.round(median(a) * 100) / 100;
     const factors = {};
-    for (const [g, a] of Object.entries(ratios)) factors[g] = Math.round(median(a) * 100) / 100;
-    const data = { ok: Object.keys(factors).length > 0, source, date: day, from, factors, rows, op: OP, how: "지역 수산물 소매가 ÷ 전국 중앙값 (품목별 비율의 중앙값)" };
+    for (const [g, a] of Object.entries(ratios)) factors[g] = round2(a);
+    // 해녀 품목은 그 품목만의 지역 계수 (예: 제주 굴 소매가 ÷ 전국 굴 중앙값)
+    const byItem = {};
+    for (const c of HAENYEO_CODES) {
+      if (!itemRatios[c]) continue;
+      const f = {};
+      for (const [g, a] of Object.entries(itemRatios[c])) f[g] = round2(a);
+      byItem[c] = { name: itemNames[c], factors: f };
+    }
+    const data = { ok: Object.keys(factors).length > 0, source, date: day, from, factors, byItem, rows, op: OP, how: "지역 수산물 소매가 ÷ 전국 중앙값 (품목별 비율의 중앙값)" };
     if (raw) return res.status(200).json({ ...data, 원본_예시: sample, log });
     if (!data.ok) return res.status(502).json({ error: "지역별 가격 자료가 없어요", log });
     cache = { at: Date.now(), data };

@@ -239,7 +239,7 @@
         ${d.askPerKg != null ? `
           <div class="price num">${won(d.askPerKg).replace('원', '')}<small>원 / kg</small></div>
           <div class="row"><button type="button" class="btn sm" data-act="d-adj" data-v="-1000">1,000원 내리기</button><button type="button" class="btn sm" data-act="d-adj" data-v="1000">1,000원 올리기</button></div>` : ''}
-        <p class="muted small" style="margin:0">${ref ? `추천 값은 kg당 ${won(ref)}이에요. ${esc(A.marketNote(d.species, d.variety))}${esc(A.regionNote(myRegion()))} 값은 손님과 직접 정하셔도 돼요.` : esc(A.marketNote(d.species, d.variety))}</p>
+        <p class="muted small" style="margin:0">${ref ? `추천 값은 kg당 ${won(ref)}이에요. ${esc(A.marketNote(d.species, d.variety))}${esc(A.regionNote(myRegion(), d.species))} 값은 손님과 직접 정하셔도 돼요.` : esc(A.marketNote(d.species, d.variety))}</p>
       </section>
       <section class="card">
         <div class="row between"><div class="eyebrow">홍보 글</div><button type="button" class="btn sm" data-act="rewrite" ${d.rewriting ? 'disabled' : ''}>${d.rewriting ? '쓰는 중…' : 'AI가 다시 쓰기'}</button></div>

@@ -71,7 +71,8 @@
     urchinroe: ['성게'], urchin: ['성게'], seaweed: ['미역'], hijiki: ['톳'], agar: ['우뭇가사리', '우무'],
     oyster: ['굴'], mussel: ['홍합'], seasquirt: ['멍게']
   };
-  const SKIP = /(건|마른|젓|액젓|냉동|수입|염장|조미|가공)/;   // 말린 것·가공품은 생물 가격과 달라서 뺌
+  // 말린 것·가공품·깐 것(깐홍합)은 껍데기째 파는 생물 가격과 달라서 뺌 ("안깐홍합"은 남김)
+  const SKIP = /(건|마른|젓|액젓|냉동|수입|염장|조미|가공|(^|\s)깐)/;
   const median = (a) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
   function summarize(names) {
     const cand = MARKET_ROWS.filter((r) => {
@@ -99,12 +100,14 @@
     if (m && m.any) return { v: m.any, live: true };
     return { v: sp ? sp.refPerKg : 0, live: false };
   }
-  function regionNote(region) {
-    const f = REGION_INDEX[region];
+  function regionNote(region, species) {
     if (!region || !REGIONS[region]) return '';
+    const own = itemFactor(region, species);
+    const f = own || REGION_INDEX[region];
     if (!f) return ` ${REGIONS[region].name} 지역 물가 자료가 없어 전국 기준으로 잡았어요.`;
+    const what = own ? REGIONS[region].name + ' ' + SPECIES[species].ko : REGIONS[region].name + ' 수산물';
     const pct = Math.round((f - 1) * 100);
-    return ` ${REGIONS[region].name} 수산물 값이 전국 평균보다 ${pct === 0 ? '비슷해서 그대로' : Math.abs(pct) + '% ' + (pct > 0 ? '높아서 그만큼 올렸어요' : '낮아서 그만큼 내렸어요')}${pct === 0 ? ' 뒀어요' : ''}.`;
+    return ` ${what} 값이 최근 30일 전국 평균보다 ${pct === 0 ? '비슷해서 그대로' : Math.abs(pct) + '% ' + (pct > 0 ? '높아서 그만큼 올렸어요' : '낮아서 그만큼 내렸어요')}${pct === 0 ? ' 뒀어요' : ''}.`;
   }
   function marketNote(species, variety) {
     const m = marketFor(species, variety);
@@ -120,7 +123,7 @@
   }
   function refPrice({ species, variety, grade, freshness, region }) {
     if (!SPECIES[species]) return 0;
-    return round100(basePerKg(species, variety).v * (GRADES[grade] || 1) * (FRESH[freshness] || 1) * regionFactor(region));
+    return round100(basePerKg(species, variety).v * (GRADES[grade] || 1) * (FRESH[freshness] || 1) * regionFactor(region, species));
   }
 
   // AI가 없을 때 쓰는 홍보 글 틀
@@ -207,14 +210,26 @@
   const isSpecial = (region, species) => !!(REGIONS[region] && REGIONS[region].specials.some(([k]) => k === species));
   // 지역 물가 계수: aT 지역별 수산물 소매가 ÷ 전국 평균 (서버 /api/region 이 계산). 자료가 없으면 1
   const REGION_INDEX = {};
+  // 전복·굴·홍합은 aT 일별 시세로 그 품목만의 지역 계수를 씀 (aT 품목 코드)
+  const ITEM_CODES = { abalone: '653', oyster: '644', mussel: '658' };
+  const ITEM_INDEX = {};
   let REGION_META = null;
+  const okFactor = (v) => v > 0.5 && v < 2;
   function setRegionIndex(data) {
     Object.keys(REGION_INDEX).forEach((k) => delete REGION_INDEX[k]);
-    Object.entries((data && data.factors) || {}).forEach(([k, v]) => { if (REGIONS[k] && v > 0.5 && v < 2) REGION_INDEX[k] = v; });
+    Object.keys(ITEM_INDEX).forEach((k) => delete ITEM_INDEX[k]);
+    Object.entries((data && data.factors) || {}).forEach(([k, v]) => { if (REGIONS[k] && okFactor(v)) REGION_INDEX[k] = v; });
+    for (const [sp, code] of Object.entries(ITEM_CODES)) {
+      const it = data && data.byItem && data.byItem[code];
+      if (!it) continue;
+      ITEM_INDEX[sp] = {};
+      Object.entries(it.factors || {}).forEach(([k, v]) => { if (REGIONS[k] && okFactor(v)) ITEM_INDEX[sp][k] = v; });
+    }
     REGION_META = data || null;
     return Object.keys(REGION_INDEX).length;
   }
-  const regionFactor = (region) => REGION_INDEX[region] || 1;
+  const itemFactor = (region, species) => (ITEM_INDEX[species] || {})[region] || null;
+  const regionFactor = (region, species) => itemFactor(region, species) || REGION_INDEX[region] || 1;
 
   const EXAMPLE_ME = { name: '김순덕(예시)', village: '하도 어촌계', region: 'jeju', phone: '010-0000-0000', place: '하도 어촌계 해녀 판매장', hours: '물질 끝나고 오후 3~5시' };
 
