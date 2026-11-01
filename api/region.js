@@ -91,7 +91,14 @@ module.exports = async (req, res) => {
       if (OP === null) return res.status(502).json({ error: "지역별 가격 API 주소를 찾지 못했어요", log });
     }
     // 3) 품목마다 지역별 가격을 받아 "지역 가격 ÷ 전국 중앙값" 비율을 모음
-    const results = await Promise.all(codes.map((c) => get(base0 + OP, key, params(c)).then((r) => ({ c, ...r }))));
+    let results = await Promise.all(codes.map((c) => get(base0 + OP, key, params(c)).then((r) => ({ c, ...r }))));
+    let source = "perRegion";
+    // perRegion에 자료가 없으면 같은 기관의 「일별 도·소매 가격정보」(perDay)로: 시군구별 가격을 함께 줌
+    if (!results.some((r) => r.items.length)) {
+      const alt = await Promise.all(codes.map((c) => get("https://apis.data.go.kr/B552845/perDay/price", key, params(c)).then((r) => ({ c, ...r }))));
+      log.push({ 단계: "perDay로 대신 조회", 결과: alt.map((r) => ({ 품목코드: r.c, status: r.status, 건수: r.items.length, 응답: r.items.length ? undefined : r.text.slice(0, 160) })) });
+      if (alt.some((r) => r.items.length)) { results = alt; source = "perDay"; }
+    }
     const ratios = {};
     let sample = null, rows = 0;
     for (const r of results) {
@@ -117,7 +124,7 @@ module.exports = async (req, res) => {
     }
     const factors = {};
     for (const [g, a] of Object.entries(ratios)) factors[g] = Math.round(median(a) * 100) / 100;
-    const data = { ok: Object.keys(factors).length > 0, date: day, from, factors, rows, op: OP, how: "지역 수산물 소매가 ÷ 전국 중앙값 (품목별 비율의 중앙값)" };
+    const data = { ok: Object.keys(factors).length > 0, source, date: day, from, factors, rows, op: OP, how: "지역 수산물 소매가 ÷ 전국 중앙값 (품목별 비율의 중앙값)" };
     if (raw) return res.status(200).json({ ...data, 원본_예시: sample, log });
     if (!data.ok) return res.status(502).json({ error: "지역별 가격 자료가 없어요", log });
     cache = { at: Date.now(), data };
