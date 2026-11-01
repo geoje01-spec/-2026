@@ -355,3 +355,18 @@ main.auth { display: none; max-width: 440px; padding-block: 28px 90px; gap: 20px
 .account .who b { font-weight: 800; }
 .account .who span { font-size: 11.5px; font-weight: 700; color: var(--sea); letter-spacing: .08em; }
 .account .btn { min-height: 36px; padding: 4px 12px; font-size: 13.5px; }
+
+/* 지도 탭 */
+.lk-map.big { height: 380px; }
+.lk-teaser { flex-direction: row; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer; color: var(--ink); font: inherit; border: 1.5px solid var(--ink); }
+.lk-teaser .grow { display: flex; flex-direction: column; gap: 2px; }
+.lk-teaser .grow b { font-family: var(--serif); font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.lk-teaser .go { font-size: 22px; color: var(--tewak); }
+.lk-teaser:hover { background: var(--paper-3); }
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
+.slot { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border: 1px dashed var(--rule); border-radius: var(--r); font-size: 13px; color: var(--ink-2); }
+.slot b { font-family: var(--latin); font-style: italic; font-weight: 600; font-size: 18px; line-height: 1; color: var(--ink-2); }
+.slot.on { border-style: solid; border-color: var(--ink); background: var(--paper); color: var(--ink); font-weight: 700; }
+.slot.on b { color: var(--sea); }
+.slot.mine { border-color: var(--tewak); }
+.slot.mine b { color: var(--tewak); }

@@ -100,7 +100,7 @@
   // 지역: 해녀는 내 정보의 지역, 손님은 고른 지역(또는 내 위치)
   const myRegion = () => ui.me.region || A.regionOf(ui.me.village) || 'jeju';
   const rp = (d) => Object.assign({ region: myRegion() }, d);
-  ui.region = store.get('hb2-region', null) || 'jeju';
+  ui.region = IS_HAENYEO ? myRegion() : (store.get('hb2-region', null) || 'jeju');   // 해녀는 내 지역 냉장고부터
   const regionName = (k) => (A.REGIONS[k] || {}).name || '';
 
   function toast(msg) {
@@ -125,7 +125,8 @@
     list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>',
     people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.8.3 5 2.6 5 5.8"/></svg>',
     shop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h16l-1.5 11h-13z"/><path d="M8 9a4 4 0 0 1 8 0"/></svg>',
-    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>'
+    user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>',
+    map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>'
   };
   // 선으로 그린 물결 두 줄 (잡지 삽화 느낌)
   const waves = '<svg class="waves" viewBox="0 0 400 36" preserveAspectRatio="none" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"><path vector-effect="non-scaling-stroke" d="M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 T250 10 T300 10 T350 10 T400 10"/><path vector-effect="non-scaling-stroke" d="M0 28 Q25 18 50 28 T100 28 T150 28 T200 28 T250 28 T300 28 T350 28 T400 28"/></g></svg>';
@@ -447,7 +448,8 @@
     const R = ui.region, here = (p) => (p.author.region || A.regionOf(p.author.village)) === R;
     // 순서: 먼저 보기 → 우리 지역 특산품 → 우리 지역 → 다른 지역 → 다 팔린 것
     const rank = (p) => (isEarly(p) && canSeeEarly(p) ? 0 : p.status === 'sold' ? 9 : here(p) ? (A.isSpecial(R, p.species) ? 1 : 2) : 3);
-    const list = S.posts.filter((p) => ui.filter === 'all' || p.species === ui.filter)
+    const lkOnly = ui.lkFilter && A.locker(ui.lkFilter);   // 지도에서 "들어 있는 해산물 보기"로 온 경우
+    const list = S.posts.filter((p) => (ui.filter === 'all' || p.species === ui.filter) && (!lkOnly || (p.locker && p.locker.id === lkOnly.id && p.status !== 'sold')))
       .sort((a, b) => rank(a) - rank(b) || new Date(b.createdAt) - new Date(a.createdAt));
     const specials = (A.REGIONS[R] || { specials: [] }).specials.map(([k, v]) => {
       const n = S.posts.filter((p) => p.species === k && p.status !== 'sold' && here(p)).length;
@@ -469,27 +471,50 @@
       </section>
       <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
       <section class="card special"><div class="eyebrow">★ ${esc(regionName(R))} 특산품 추천</div><div class="sp-grid">${specials}</div><p class="muted small" style="margin:0">있는 건 눌러서 보고, 없는 건 예약해 두면 올라올 때 먼저 보여 드려요.</p></section>
-      ${lockerSection(R)}
+      ${lockerTeaser(R)}
       <div class="chips"><button type="button" class="chip" data-act="filter" data-v="all" aria-pressed="${ui.filter === 'all'}">전체</button>${kinds.map((k) => `<button type="button" class="chip" data-act="filter" data-v="${k}" aria-pressed="${ui.filter === k}">${esc(SP[k].ko)}</button>`).join('')}</div>
+      ${lkOnly ? `<div class="notice row between" style="flex-wrap:nowrap"><span>🧊 ${esc(lkOnly.name)} 냉장고에 들어 있는 것만 보는 중</span><button type="button" class="btn sm" data-act="lk-all">모두 보기</button></div>` : ''}
       ${list.length ? list.map((p, i) => (isEarly(p) && !canSeeEarly(p) ? teaser(p) : postCard(p, false, i))).join('') : '<div class="empty">아직 올라온 해산물이 없어요. 물질 끝나는 오후에 다시 봐 주세요.</div>'}`;
   }
 
-  function lockerSection(R) {
+  // 해산물 화면에서 지도 탭으로 가는 바로가기
+  function lockerTeaser(R) {
     const lks = A.lockersIn(R);
     if (!lks.length) return '';
-    return `<section class="card lockers" id="lockers">
-        <div class="eyebrow">🧊 만나지 않고 받아 가요</div>
-        <h2>무인 냉장고 지도</h2>
-        <p class="muted small" style="margin:0">삼촌이 냉장고 칸에 넣고 잠가 두면, 주문한 손님에게만 비밀번호가 문자로 가요. 냉장고를 눌러 길을 찾으세요.</p>
-        <div id="lk-map" class="lk-map" role="region" aria-label="${esc(regionName(R))} 무인 냉장고 지도"></div>
-        <ul class="lk-list">${lks.map((l) => {
-          const n = S.posts.filter((p) => p.locker && p.locker.id === l.id && p.status !== 'sold').length;
-          return `<li><button type="button" class="lk-name" data-act="lk-show" data-v="${esc(l.id)}"><b>${esc(l.name)}</b><span>${esc(l.place)}</span></button>
-            <span class="pill ${n ? 'ok' : 'off'}">${n ? n + '가지 있어요' : '비어 있어요'}</span>
-            <a class="btn sm" href="${esc(A.navLinks(l).kakao)}" target="_blank" rel="noopener">길찾기</a></li>`;
-        }).join('')}</ul>
-        <p class="muted small" style="margin:0">냉장고 위치는 시연용 예시예요. 실제 설치 장소는 어촌계와 정해요.</p>
-      </section>`;
+    const n = S.posts.filter((p) => p.status !== 'sold' && p.locker && lks.some((l) => l.id === p.locker.id)).length;
+    return `<button type="button" class="card lk-teaser" data-act="tab" data-v="map"><span class="lk-badge" aria-hidden="true">🧊</span>
+        <span class="grow"><b>${esc(regionName(R))} 무인 냉장고 ${lks.length}곳</b><span class="muted small">지금 ${n}가지 들어 있어요 · 지도에서 길찾기</span></span><span class="go" aria-hidden="true">→</span></button>`;
+  }
+
+  /* ---------- 지도 탭 (해녀·손님 모두) ---------- */
+  const inLocker = (id) => S.posts.filter((p) => p.locker && p.locker.id === id && p.status !== 'sold');
+  function lockerCard(l, haenyeo) {
+    const inside = inLocker(l.id), nv = A.navLinks(l);
+    const slots = Array.from({ length: l.slots }, (_, k) => k + 1).map((n) => {
+      const p = inside.find((x) => +x.locker.slot === n);
+      return `<span class="slot${p ? ' on' : ''}${p && p.ownerId === DEV ? ' mine' : ''}"><b>${n}</b>${p ? esc(SP[p.species].ko) + (p.ownerId === DEV ? ' · 내 것' : '') : '빈 칸'}</span>`;
+    }).join('');
+    return `<article class="card lk-card">
+        <div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
+          <button type="button" class="lk-name" data-act="lk-show" data-v="${esc(l.id)}"><b>${esc(l.name)} 냉장고</b><span>${esc(l.place)}</span></button>
+          <span class="pill ${inside.length ? 'ok' : 'off'}">${inside.length ? inside.length + '가지 있어요' : '비어 있어요'}</span>
+        </div>
+        <div class="slots" aria-label="칸 ${l.slots}개">${slots}</div>
+        <div class="row">
+          <a class="btn sm primary" href="${esc(nv.kakao)}" target="_blank" rel="noopener">카카오맵 길찾기</a>
+          <a class="btn sm" href="${esc(nv.google)}" target="_blank" rel="noopener">구글 지도</a>
+          ${!haenyeo && inside.length ? `<button type="button" class="btn sm" data-act="lk-items" data-v="${esc(l.id)}">들어 있는 해산물 보기</button>` : ''}
+        </div>
+      </article>`;
+  }
+  function mapView() {
+    const R = ui.region, lks = A.lockersIn(R), h = ui.role === 'h';
+    return `<div class="stack" style="gap:8px"><div class="eyebrow">🧊 만나지 않고 주고받는 무인 냉장고</div><h1>냉장고 지도</h1>
+        <p class="muted" style="margin:0">${h ? '어느 냉장고에 빈 칸이 있는지 보세요. 넣고 잠근 뒤 비밀번호는 산 손님에게만 문자로 보내요.' : '삼촌이 냉장고 칸에 넣고 잠가 두면, 주문한 손님에게만 비밀번호가 문자로 가요. 냉장고를 눌러 길을 찾으세요.'}</p></div>
+      <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
+      <div id="lk-map" class="lk-map big" role="region" aria-label="${esc(regionName(R))} 무인 냉장고 지도"></div>
+      ${lks.length ? lks.map((l) => lockerCard(l, h)).join('') : '<div class="empty">이 지역에는 아직 냉장고가 없어요.</div>'}
+      <p class="muted small" style="margin:0">냉장고 위치는 시연용 예시예요. 실제 설치 장소는 어촌계와 정해요.</p>`;
   }
 
   /* ---------- 손님: 먼저 보기 예약 ---------- */
@@ -535,11 +560,13 @@
     h: [
       { id: 'upload', label: '올리기', icon: I.camera, view: hUpload },
       { id: 'mine', label: '내 글', icon: I.list, view: hMine, badge: () => S.posts.filter((p) => p.ownerId === DEV && p.status !== 'sold').length },
+      { id: 'map', label: '지도', icon: I.map, view: mapView },
       { id: 'exp', label: '체험', icon: I.people, view: hExp },
       { id: 'me', label: '내 정보', icon: I.user, view: hMe }
     ],
     c: [
       { id: 'market', label: '해산물', icon: I.shop, view: cMarket, badge: () => S.posts.filter((p) => p.status !== 'sold').length },
+      { id: 'map', label: '지도', icon: I.map, view: mapView },
       { id: 'exp', label: '체험', icon: I.people, view: cExp }
     ]
   };
@@ -684,7 +711,7 @@
     const act = b.dataset.act, v = b.dataset.v, d = ui.draft;
     switch (act) {
       case 'logout': try { localStorage.removeItem('haenyeo_session'); } catch { /* 저장 안 되는 환경 */ } location.reload(); break;
-      case 'tab': ui.tab[ui.role] = v; ui.delArm = null; render(); window.scrollTo(0, 0); break;
+      case 'tab': ui.tab[ui.role] = v; ui.delArm = null; ui.lkFilter = null; render(); window.scrollTo(0, 0); break;
       case 'filter': ui.filter = v; render(); break;
       case 'copy': copy(v, '전화번호를 복사했어요.'); break;
       case 'dismiss-post': ui.lastPost = null; render(); break;
@@ -787,11 +814,12 @@
       case 'd-slot': if (d.locker) d.locker.slot = +v; render(); break;
       case 'lk-show': {
         const l = A.locker(v); if (!l) break;
-        if (ui.role !== 'c') { window.open(A.navLinks(l).kakao, '_blank', 'noopener'); break; }   // 해녀 화면엔 지도가 없어서 바로 길찾기
-        ui.region = l.region; store.set('hb2-region', l.region); ui.focusLocker = v; ui.tab.c = 'market'; render();
-        const m = $('#lockers'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        ui.region = l.region; if (ui.role === 'c') store.set('hb2-region', l.region);
+        ui.focusLocker = v; ui.tab[ui.role] = 'map'; render(); window.scrollTo(0, 0);
         break;
       }
+      case 'lk-items': ui.lkFilter = v; ui.filter = 'all'; ui.tab.c = 'market'; render(); window.scrollTo(0, 0); break;
+      case 'lk-all': ui.lkFilter = null; render(); break;
       case 'pin-open':
         ui.pinFor = ui.pinFor === b.dataset.id ? null : b.dataset.id;
         ui.pin = { code: A.newPin(), phone: '', until: '오늘 저녁 8시까지' }; render(); break;
