@@ -862,8 +862,19 @@ function station(q){
   return STATIONS.find(s=>s.code===q) || STATIONS.find(s=>q && (s.name.includes(q)||q.includes(s.name.replace("제주 ",""))) ) || null;
 }
 let PROXY=false;   // server.py로 열면 true (키는 서버에 보관, CORS 문제 없음)
+let PROXY_WHY="";   // 서버 확인이 안 된 이유 (화면 "데모 수온 (…)"에 보여 줌)
 async function detectProxy(){
-  try{ const r=await fetch("/api/health",{cache:"no-store"}); if(r.ok){ const j=await r.json(); PROXY=!!j.ok; S.proxyInfo=j; } }catch(e){ PROXY=false; }
+  // 서버가 막 깨어날 때(콜드 스타트) 한 번 실패할 수 있어 3번까지 다시 해 봄
+  for(let i=0;i<3 && !PROXY;i++){
+    if(i) await new Promise(r=>setTimeout(r,1500));
+    try{
+      const ctl=new AbortController(), to=setTimeout(()=>ctl.abort(),8000);
+      const r=await fetch("/api/health",{cache:"no-store",signal:ctl.signal}); clearTimeout(to);
+      const text=await r.text(); let j=null; try{ j=JSON.parse(text); }catch(e){}
+      if(r.ok && j && j.ok){ PROXY=true; S.proxyInfo=j; PROXY_WHY=""; }
+      else PROXY_WHY = location.protocol==="file:" ? "파일로 열었어요" : `서버 응답 ${r.status}${j?"":" (JSON 아님)"}`;
+    }catch(e){ PROXY_WHY = location.protocol==="file:" ? "파일로 열었어요" : (e.name==="AbortError"?"서버 응답 없음(8초)":"서버 연결 실패"); }
+  }
   setMode(); apiNote();
 }
 const hasData=()=>PROXY || !!S.water.key;
@@ -909,7 +920,7 @@ async function getWater(q){
   const st=station(q) || {code:String(q||"").trim(),name:String(q||"").trim(),reg:null};
   if(!hasData()){
     let h=0; for(const c of st.code) h=(h*31+c.charCodeAt(0))>>>0;
-    return {site:st.name,code:st.code,reg:st.reg,temp:Math.round((13+(h%70)/10)*10)/10,source:"데모 수온 (API 미연결)",time:new Date(),obsTime:null};
+    return {site:st.name,code:st.code,reg:st.reg,temp:Math.round((13+(h%70)/10)*10)/10,source:"데모 수온 (API 미연결"+(PROXY_WHY?": "+PROXY_WHY:"")+")",time:new Date(),obsTime:null};
   }
   let {items}=await waterItems(st.code,today());
   if(!items.length){ const y=kstNow(); y.setDate(y.getDate()-1); ({items}=await waterItems(st.code,ymd(y))); }   // 자정 직후엔 어제 자료
@@ -942,7 +953,7 @@ async function getSeaFcst(reg){
     return {date:`${d.getMonth()+1}/${d.getDate()}(${"일월화수목금토"[d.getDay()]})`,day:n,waveMin:min,waveMax:max,weather:wf||"",level:waveVerdict(max)}; };
   if(!hasData()){
     const days=[]; for(let n=4;n<=10;n++){ const a=Math.round((0.5+((n*7+reg.length)%9)/6)*10)/10; days.push(mk(n,Math.max(0.5,a-0.5),a,["맑음","구름많음","흐림","흐리고 비"][n%4])); }
-    return {reg,regName:REG_NAME[reg]||reg,tmFc:tm,days,source:"데모 예보 (API 미연결)"};
+    return {reg,regName:REG_NAME[reg]||reg,tmFc:tm,days,source:"데모 예보 (API 미연결"+(PROXY_WHY?": "+PROXY_WHY:"")+")"};
   }
   const j=await dataGo("1360000/MidFcstInfoService/getMidSeaFcst",{dataType:"JSON",pageNo:"1",numOfRows:"10",regId:reg,tmFc:tm});
   const it=(findItems(j)||[])[0]; if(!it) throw new Error("해상예보 자료가 아직 없어요 (발표 직후일 수 있어요)");
@@ -985,6 +996,7 @@ function renderFcst(f){
 const LAST={sea:null,fcst:null};
 const fresh=x=>x && Date.now()-x.at<600000;
 async function checkSea(site){
+  if(!PROXY && location.protocol!=="file:") await detectProxy();   // 처음에 서버 확인이 실패했으면 다시 해 봄
   try{ const w=await getWater(site); const a=assessDive(w); renderWater(w,a); const r={...w, ...a}; LAST.sea={code:w.code,at:Date.now(),r}; return r; }
   catch(e){ $("seaOut").innerHTML=`<p class="note" style="color:var(--danger)">${esc(e.message||e)}</p>${PROXY?"":`<p class="note">브라우저 직접 호출이 막혔을 수 있어요(CORS). server.py로 실행하면 해결돼요.</p>`}`; return {error:String(e.message||e)}; }
 }
