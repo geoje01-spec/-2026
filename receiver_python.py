@@ -19,10 +19,12 @@ serial.set_baud_rate(BaudRate.BAUD_RATE115200)
 basic.show_icon(IconNames.DIAMOND)
 
 show = 0   # 보여 줄 그림: 0 없음, 1 괜찮아요(체크), 2 확인 신호(놀란 얼굴), 3 도움 신호(해골), 4 휴식 신호(화살표)
+got = 0    # 지금까지 받은 해녀 신호 수
 
 # 해녀 → PC
 def on_received_string(s):
-    global show
+    global show, got
+    got += 1
     if s[0:1] == "A":
         serial.write_line(s)
         show = 1
@@ -48,6 +50,13 @@ def on_data_received():
         else:
             show = 4
 serial.on_data_received(serial.delimiters(Delimiters.NEW_LINE), on_data_received)
+
+# 3초마다 "HB,받은수"를 PC로 보냄 → 웹앱이 수신기는 잘 연결됐는지, 해녀 신호가 안 오는 건지 구별
+def heartbeat_loop():
+    while True:
+        serial.write_line("HB," + str(got))
+        basic.pause(3000)
+control.in_background(heartbeat_loop)
 
 # 그림은 여기서만 보여 줌
 def on_forever_screen():

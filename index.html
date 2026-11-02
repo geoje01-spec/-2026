@@ -815,7 +815,9 @@ function connInfo(){
   const s=Math.round((now()-(rx.at||rx.since||now()))/1000);
   $("connText").textContent = rx.n
     ? `마이크로비트 연결됨 · 받은 줄 ${rx.n}개 · 마지막 ${s}초 전 "${rx.last.slice(0,24)}"`
-    : `마이크로비트 연결됨 · 받은 줄 0개 (${s}초째)${s>=5?" — 메이크코드 창을 닫고 다시 연결해 보세요":""}`;
+    : rx.hb && now()-rx.hb<8000   // 수신기의 3초 "HB" 줄은 오는데 해녀 신호가 없음 → 해녀용 쪽 문제
+    ? `수신기 연결 잘 됨 · 해녀 신호 아직 0개 (${s}초째) — 해녀용 마이크로비트를 켜고, B로 끊었으면 B를 한 번 더 누르세요`
+    : `마이크로비트 연결됨 · 받은 줄 0개 (${s}초째)${s>=5?" — 메이크코드 창을 닫고, 수신용에 receiver_python.py를 넣었는지 확인하세요":""}`;
 }
 function setConn(){
   const dot=$("connDot"), txt=$("connText");
@@ -829,7 +831,7 @@ $("btnSerial").onclick=async()=>{
   try{
     const p=await navigator.serial.requestPort();
     await p.open({baudRate:115200});   // 다 열린 뒤에 port에 넣음 (여는 중에 "0개 (1793601019초째)"처럼 보이지 않게)
-    port=p; sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false,last:null,info:null}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now()});
+    port=p; sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false,last:null,info:null}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now(),hb:0,hbGot:0});
     setConn(); log("수신용 마이크로비트 연결됨"); readLoop();
   }catch(e){ port=null; setConn(); toast("연결하지 못했어요: "+(e.message||e)); }
 };
@@ -838,7 +840,7 @@ async function readLoop(){
   while(port && port.readable && reading){
     const reader=port.readable.getReader();
     try{ while(reading){ const {value,done}=await reader.read(); if(done) break;
-        buf+=dec.decode(value,{stream:true}); let i; while((i=buf.indexOf("\n"))>=0){ const ln=buf.slice(0,i).trim(); buf=buf.slice(i+1); if(!ln) continue; rx.n++; rx.last=ln; rx.at=now(); ingest(ln); } } }
+        buf+=dec.decode(value,{stream:true}); let i; while((i=buf.indexOf("\n"))>=0){ const ln=buf.slice(0,i).trim(); buf=buf.slice(i+1); if(!ln) continue; if(ln.startsWith("HB,")){ rx.hb=now(); rx.hbGot=parseInt(ln.slice(3))||0; continue; } rx.n++; rx.last=ln; rx.at=now(); ingest(ln); } } }
     catch(e){ log("수신 오류: "+(e.message||e)); }
     finally{ reader.releaseLock(); }
   }
