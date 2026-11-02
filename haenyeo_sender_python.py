@@ -92,7 +92,7 @@ def ask_loop():
             basic.pause(200)
 control.in_background(ask_loop)
 
-# "괜찮아요" 응답 = A 또는 B 버튼
+# "괜찮아요" 응답 = A 버튼
 def answer_ok():
     global asking, sos, fall
     if asking:
