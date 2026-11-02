@@ -812,7 +812,7 @@ function serialOdd(line){
 }
 function connInfo(){
   if(!port || buoy.last || buoy.info) return;
-  const s=Math.round((now()-(rx.at||rx.since))/1000);
+  const s=Math.round((now()-(rx.at||rx.since||now()))/1000);
   $("connText").textContent = rx.n
     ? `마이크로비트 연결됨 · 받은 줄 ${rx.n}개 · 마지막 ${s}초 전 "${rx.last.slice(0,24)}"`
     : `마이크로비트 연결됨 · 받은 줄 0개 (${s}초째)${s>=5?" — 메이크코드 창을 닫고 다시 연결해 보세요":""}`;
@@ -827,9 +827,9 @@ $("btnSerial").onclick=async()=>{
   if(port){ reading=false; try{ await port.close(); }catch(e){} port=null; setConn(); log("마이크로비트 연결 끊음"); return; }
   if(!("serial" in navigator)){ toast("이 브라우저는 USB 연결을 지원하지 않아요. PC의 크롬·엣지에서 파일로 열어주세요."); return; }
   try{
-    port=await navigator.serial.requestPort();
-    await port.open({baudRate:115200});
-    sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false,last:null,info:null}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now()});
+    const p=await navigator.serial.requestPort();
+    await p.open({baudRate:115200});   // 다 열린 뒤에 port에 넣음 (여는 중에 "0개 (1793601019초째)"처럼 보이지 않게)
+    port=p; sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false,last:null,info:null}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now()});
     setConn(); log("수신용 마이크로비트 연결됨"); readLoop();
   }catch(e){ port=null; setConn(); toast("연결하지 못했어요: "+(e.message||e)); }
 };
