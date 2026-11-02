@@ -8,13 +8,14 @@
 #   물에 들어가면 라디오가 끊기고, 올라오면 다시 잡힘. 그 끊긴 시간이 잠수 시간
 #
 # 관제(웹앱 AI 에이전트)에서 오는 신호
-#   Q,번호        괜찮으세요? → 놀란 얼굴·소리, A나 B 버튼으로 "괜찮아요"
+#   Q,번호        괜찮으세요? → 놀란 얼굴·소리, A 버튼으로 "괜찮아요"
 #   R,번호 / R,0  쉬러 나오세요 → 위쪽 화살표와 낮은 소리 10초
 #   H,번호        다른 해녀가 물속에서 안 올라옴 → 내가 그 해녀가 아니면 경고 표시와 높은 소리 15초
 #
 # 버튼
-#   A 또는 B  = 괜찮아요 (장갑 낀 손으로 아무거나)
-#   A+B       = SOS (확인 없이 바로 신고)
+#   A         = 괜찮아요
+#   B         = 시연용 물속/물 위 바꾸기. 한 번 누르면 신호를 끊음(물속, 아래 화살표), 다시 누르면 다시 보냄(물 위)
+#   A+B       = SOS (확인 없이 바로 신고. 신호를 끊고 있었어도 다시 보냄)
 
 DIVER_ID = 1          # 해녀마다 번호를 다르게 바꿔서 다운로드 (1~99)
 RADIO_GROUP = 77      # 수신용 마이크로비트와 같은 번호
@@ -29,6 +30,7 @@ fall = 0           # 1이면 자유낙하 또는 강한 충격 감지
 asking = False     # True면 관제가 "괜찮으세요?" 확인 중
 recall_until = 0   # 이 시각까지 "쉬러 나오세요" 알림
 help_until = 0     # 이 시각까지 "동료가 위험해요" 알림
+paused = False     # True면 B 버튼으로 신호를 끊은 상태 (시연용 물속)
 last_move = input.running_time()
 bpm = -1           # 맥박 센서가 없으면 -1
 last_beat = 0
@@ -108,15 +110,24 @@ def on_button_pressed_a():
     answer_ok()
 input.on_button_pressed(Button.A, on_button_pressed_a)
 
+# B = 시연용 물속/물 위 바꾸기
 def on_button_pressed_b():
-    answer_ok()
+    global paused
+    paused = not paused
+    if paused:
+        basic.show_arrow(ArrowNames.SOUTH)   # 물속: 신호 끊음
+    else:
+        basic.show_arrow(ArrowNames.NORTH)   # 물 위: 다시 보냄
+    basic.pause(500)
+    basic.clear_screen()
 input.on_button_pressed(Button.B, on_button_pressed_b)
 
 # A+B 동시에 누르기 = SOS
 def on_button_pressed_ab():
-    global sos, asking
+    global sos, asking, paused
     sos = 1
     asking = False
+    paused = False
     basic.show_icon(IconNames.NO)
 input.on_button_pressed(Button.AB, on_button_pressed_ab)
 
@@ -159,6 +170,9 @@ def on_forever():
     still = (input.running_time() - last_move) // 1000
     if still > 999:
         still = 999
+    if paused:   # B로 끊은 동안은 보내지 않음 (관제는 4초 뒤 물속으로 판단)
+        basic.pause(1000)
+        return
     msg = str(DIVER_ID) + "," + str(input.temperature()) + "," + str(bpm) + "," + str(fall) + "," + str(still) + "," + str(sos)
     radio.send_string(msg)
     t = input.running_time()
