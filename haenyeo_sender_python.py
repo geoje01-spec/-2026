@@ -61,7 +61,7 @@ def alarm_loop():
     while True:
         if not asking and input.running_time() < help_until:
             basic.show_icon(IconNames.SKULL)
-            music.play_tone(Note.C6, music.beat(BeatFraction.QUARTER))
+            music.play_tone(1047, music.beat(BeatFraction.QUARTER))   # 높은 도(C6). MakeCode 음 이름은 B5까지만 있어서 숫자로
             music.play_tone(Note.A5, music.beat(BeatFraction.QUARTER))
             basic.pause(200)
             basic.clear_screen()
