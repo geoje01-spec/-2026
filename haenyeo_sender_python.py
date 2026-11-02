@@ -140,11 +140,11 @@ def pulse_loop():
             gap = now - last_beat
             last_beat = now
             if gap > 300 and gap < 2000:
-                b = int(60000 / gap + 0.5)
+                b = Math.round(60000 / gap)   # MakeCode의 int()는 글자를 숫자로 바꾸는 것이라 반올림은 Math.round
                 if bpm < 0:
                     bpm = b
                 else:
-                    bpm = int(bpm * 0.7 + b * 0.3 + 0.5)
+                    bpm = Math.round(bpm * 0.7 + b * 0.3)
         elif v < PULSE_THRESHOLD - 50:
             beat_high = False
         # 4초 넘게 박동이 안 잡히면 측정 불가로 표시
