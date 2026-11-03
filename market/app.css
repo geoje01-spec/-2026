@@ -274,30 +274,8 @@ textarea { min-height: 110px; border: 1px solid var(--rule); border-bottom: 2px 
 .sp-chip.on { border-color: var(--ok); background: var(--ok-bg); }
 .sp-chip.on span { color: var(--ok); }
 
-/* 무인 냉장고 */
-.locker { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--ink); border-radius: var(--r); background: var(--paper); }
-.locker .grow { display: flex; flex-direction: column; gap: 1px; line-height: 1.35; }
-.locker .grow b { font-family: var(--serif); font-weight: 800; font-size: 16px; letter-spacing: -0.02em; }
-.lk-badge { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--info-bg); font-size: 18px; }
-@media (max-width: 400px) { .locker { flex-wrap: wrap; } .locker > .row { width: 100%; } .locker > .row .btn { flex: 1; } }
-/* 지도: Leaflet 층이 상단 머리·아래 탭 위로 올라오지 않게 가둠 */
-.lk-map { position: relative; z-index: 0; isolation: isolate; height: 280px; border: 1px solid var(--ink); border-radius: var(--r); overflow: hidden; background: var(--paper-3); }
-.lk-pin span { position: absolute; transform: translate(-50%, -50%); width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 2px solid #fff; background: var(--ink); color: var(--paper); font: 800 14px/1 var(--serif); box-shadow: 0 2px 6px rgba(0,0,0,.35); }
-.lk-pin i { position: absolute; top: -7px; right: -9px; font: 700 10.5px/1 var(--sans); font-style: normal; background: var(--tewak); color: #fff; border-radius: 999px; padding: 2px 5px; border: 1.5px solid #fff; }
-.lk-pop { display: flex; flex-direction: column; gap: 3px; font: 14px/1.5 var(--sans); color: #10303a; }
-.lk-pop b { font-family: var(--serif); font-size: 16px; }
-.lk-pop a { color: #c2410c; font-weight: 700; }
-.lockers { scroll-margin-top: 130px; }
-.lk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.lk-list li { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid var(--rule); }
-.lk-name { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 0; border: 0; background: none; padding: 0; text-align: left; cursor: pointer; color: var(--ink); }
-.lk-name b { font-family: var(--serif); font-weight: 800; font-size: 17px; }
-.lk-name span { font-size: 13px; color: var(--ink-2); }
-.leaflet-container { font-family: var(--sans); }
 
 /* 비밀번호 보내기 (해녀) */
-.pin-box { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1.5px solid var(--tewak); border-radius: var(--r); background: var(--paper); }
-#pin-code { font-family: var(--serif); font-weight: 800; font-size: 24px; letter-spacing: .2em; text-align: center; }
 
 /* 후기 */
 .post-h .rate { margin-left: 8px; color: var(--tewak); font-weight: 800; white-space: nowrap; }
@@ -356,20 +334,6 @@ main.auth { display: none; max-width: 440px; padding-block: 28px 90px; gap: 20px
 .account .who span { font-size: 11.5px; font-weight: 700; color: var(--sea); letter-spacing: .08em; }
 .account .btn { min-height: 36px; padding: 4px 12px; font-size: 13.5px; }
 
-/* 지도 탭 */
-.lk-map.big { height: 380px; }
-.lk-teaser { flex-direction: row; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer; color: var(--ink); font: inherit; border: 1.5px solid var(--ink); }
-.lk-teaser .grow { display: flex; flex-direction: column; gap: 2px; }
-.lk-teaser .grow b { font-family: var(--serif); font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
-.lk-teaser .go { font-size: 22px; color: var(--tewak); }
-.lk-teaser:hover { background: var(--paper-3); }
-.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; }
-.slot { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border: 1px dashed var(--rule); border-radius: var(--r); font-size: 13px; color: var(--ink-2); }
-.slot b { font-family: var(--latin); font-style: italic; font-weight: 600; font-size: 18px; line-height: 1; color: var(--ink-2); }
-.slot.on { border-style: solid; border-color: var(--ink); background: var(--paper); color: var(--ink); font-weight: 700; }
-.slot.on b { color: var(--sea); }
-.slot.mine { border-color: var(--tewak); }
-.slot.mine b { color: var(--tewak); }
 
 /* 익명 채팅 */
 .alias-big { font-family: var(--serif); font-weight: 800; font-size: 34px; letter-spacing: -0.02em; line-height: 1.1; }
@@ -392,10 +356,6 @@ main.auth { display: none; max-width: 440px; padding-block: 28px 90px; gap: 20px
 .msg.me { align-self: flex-end; align-items: flex-end; }
 .msg.me p { background: var(--ink); color: var(--paper); border-color: var(--ink); border-radius: 16px 4px 16px 16px; }
 body.haenyeo .msg p { font-size: 18px; }
-.pin-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border: 2px solid var(--tewak); border-radius: var(--r); background: var(--paper-2); min-width: 220px; }
-.pin-card b { color: var(--tewak); }
-.pin-card .code { font-family: var(--serif); font-weight: 800; font-size: 40px; letter-spacing: .18em; line-height: 1.1; color: var(--ink); }
-.pin-card .btn { align-self: flex-start; margin-top: 4px; }
 .quick-replies { display: flex; gap: 6px; flex-wrap: wrap; }
 .quick-replies .chip { min-height: 38px; padding: 5px 12px; font-size: 14px; font-weight: 600; }
 .chat-input { display: flex; gap: 8px; align-items: flex-end; position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); background: var(--paper); padding: 8px 0; z-index: 2; }

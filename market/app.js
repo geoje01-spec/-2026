@@ -105,8 +105,7 @@
     newProg: false,
     rv: { text: '' },                                                           // 먼저 보기 예약 쓰는 중
     rev: { postId: null, stars: 5, text: '', busy: false, msg: null },         // 후기 쓰는 중
-    chat: { id: null, pending: null, draft: '', pinOpen: false, pin: { code: '', until: '오늘 저녁 8시까지' } },   // 채팅
-    focusLocker: null
+    chat: { id: null, pending: null, draft: '' }   // 채팅
   };
   function anonMe(m) { ['name', 'phone', 'village', 'place'].forEach((k) => delete m[k]); return m; }
   // 글·체험에 붙는 해녀 정보: 별명·지역·판매 시간만
@@ -115,7 +114,7 @@
   // 지역: 해녀는 내 정보의 지역, 손님은 고른 지역(또는 내 위치)
   const myRegion = () => ui.me.region || 'jeju';
   const rp = (d) => Object.assign({ region: myRegion() }, d);
-  ui.region = IS_HAENYEO ? myRegion() : (store.get('hb2-region', null) || 'jeju');   // 해녀는 내 지역 냉장고부터
+  ui.region = IS_HAENYEO ? myRegion() : (store.get('hb2-region', null) || 'jeju');
   const regionName = (k) => (A.REGIONS[k] || {}).name || '';
 
   function toast(msg) {
@@ -141,8 +140,7 @@
     people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.8.3 5 2.6 5 5.8"/></svg>',
     shop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 9h16l-1.5 11h-13z"/><path d="M8 9a4 4 0 0 1 8 0"/></svg>',
     user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>',
-    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg>',
-    map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>'
+    chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8M8 13h5"/></svg>'
   };
   // 선으로 그린 물결 두 줄 (잡지 삽화 느낌)
   const waves = '<svg class="waves" viewBox="0 0 400 36" preserveAspectRatio="none" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"><path vector-effect="non-scaling-stroke" d="M0 10 Q25 0 50 10 T100 10 T150 10 T200 10 T250 10 T300 10 T350 10 T400 10"/><path vector-effect="non-scaling-stroke" d="M0 28 Q25 18 50 28 T100 28 T150 28 T200 28 T250 28 T300 28 T350 28 T400 28"/></g></svg>';
@@ -151,19 +149,18 @@
 
   /* ---------- 공용 조각 ---------- */
   // 손님이 해녀에게 연락하는 곳: 전화번호 대신 익명 채팅 (ref: 어떤 글·체험에 대한 채팅인지)
-  function chatBox(ref, title, seller, a, lk) {
+  function chatBox(ref, title, seller, a) {
     if (seller === DEV) return '';   // 내 글엔 채팅 버튼 없음
     const t = chatFind(ref, DEV);
     return `<div class="contact">
       <div class="row between"><div><b>${esc(a.alias)}</b> <span class="muted small">${esc(regionName(a.region))} 해녀</span></div><span class="pill info">익명</span></div>
       <button type="button" class="btn primary" data-act="chat-start" data-type="${ref.type}" data-id="${esc(ref.id)}">💬 ${t ? '채팅 이어 하기' : ref.type === 'post' ? '채팅으로 주문하기' : '채팅으로 물어보기'}</button>
-      <p class="small" style="margin:0">🔒 이름과 전화번호는 서로 보이지 않아요.${lk ? ` 채팅으로 주문하면 삼촌이 <b>${esc(lk.name)} 냉장고</b>에 넣고 <b>비밀번호를 채팅으로</b> 보내 드려요.` : ''}</p>
-      <div class="kv">${lk ? `<span>받는 곳 <b>${esc(lk.name)} 냉장고</b></span>` : ''}${a.hours ? `<span>판매 시간 <b>${esc(a.hours)}</b></span>` : ''}</div>
+      <p class="small" style="margin:0">🔒 이름과 전화번호는 서로 보이지 않아요. 받는 곳과 시간은 채팅으로 정해요.</p>
+      <div class="kv">${a.hours ? `<span>판매 시간 <b>${esc(a.hours)}</b></span>` : ''}</div>
     </div>`;
   }
   function shareText(p) {
-    const lk = p.locker && A.locker(p.locker.id);
-    return `[해녀바당] ${p.promo}\n\n${A.label(p.species, p.variety)} ${p.grade}등급 ${kg(p.weightKg)}${p.askPerKg ? ` · kg당 ${won(p.askPerKg)}` : ''}\n주문: 해녀바당에서 ${p.author.alias}에게 채팅 (이름·전화번호 없이)\n${lk ? `받는 곳: ${lk.name} 무인 냉장고 (${lk.place}) · 비밀번호는 채팅으로` : ''}\n${location.origin}/market/`;
+    return `[해녀바당] ${p.promo}\n\n${A.label(p.species, p.variety)} ${p.grade}등급 ${kg(p.weightKg)}${p.askPerKg ? ` · kg당 ${won(p.askPerKg)}` : ''}\n주문: 해녀바당에서 ${p.author.alias}에게 채팅 (이름·전화번호 없이)\n${location.origin}/market/`;
   }
 
   /* ---------- 익명 채팅 ---------- */
@@ -194,11 +191,10 @@
       if (!item) return;
       c = chatFind(ref, DEV);
       const title = ref.type === 'post' ? A.label(item.species, item.variety) : item.title;
-      const lk = ref.type === 'post' && item.locker && A.locker(item.locker.id);
       if (!c) pending = { ref, title, sellerId: item.ownerId, sellerAlias: item.author.alias, buyerId: DEV, buyerAlias: ME_ALIAS };
-      ui.chat.draft = c ? '' : ref.type === 'post' ? `${title} 주문하고 싶어요.${lk ? ` ${lk.name} 냉장고로 받을게요.` : ''}` : `${title} 하고 싶어요. 언제 되나요?`;
+      ui.chat.draft = c ? '' : ref.type === 'post' ? `${title} 주문하고 싶어요.` : `${title} 하고 싶어요. 언제 되나요?`;
     }
-    Object.assign(ui.chat, { id: c ? c.id : null, pending, pinOpen: false });
+    Object.assign(ui.chat, { id: c ? c.id : null, pending });
     if (c) markSeen(c);
     ui.tab[ui.role] = 'chat'; render(); window.scrollTo(0, document.body.scrollHeight);
   }
@@ -237,7 +233,7 @@
         return `<li><button type="button" data-act="chat-open" data-id="${esc(c.id)}">
           <span class="who"><b>${esc(otherAlias(c))}</b><time>${last ? esc(ago(last.at)) : ''}</time></span>
           <span class="what">${esc(chatTitle(c))}${c.example ? ' · 예시' : ''}</span>
-          <span class="last">${last ? (last.kind === 'pin' ? '🔒 냉장고 비밀번호를 보냈어요' : esc(last.text)) : ''}</span>
+          <span class="last">${last ? esc(last.text) : ''}</span>
           ${n ? `<span class="badge num">${n}</span>` : ''}</button></li>`;
       }).join('')}</ul>` : `<div class="empty">아직 채팅이 없어요. ${IS_HAENYEO ? '손님이 글을 보고 채팅을 보내면 여기에 와요.' : '해산물 글에서 "채팅으로 주문하기"를 눌러 보세요.'}</div>`}`;
   }
@@ -246,40 +242,17 @@
     const t = c || pend;
     if (!t) { ui.chat.id = null; return chatList(); }
     const iSell = t.sellerId === DEV;
-    const post = refPost(t), lk = post && post.locker && A.locker(post.locker.id);
     const msgs = (c ? c.msgs : []).map((m) => {
       const mine = m.from === DEV;
-      if (m.kind === 'pin' && m.pin) {
-        const l = A.locker(m.pin.locker), nv = l && A.navLinks(l);
-        return `<li class="msg pin ${mine ? 'me' : ''}"><div class="pin-card">
-          <b>🔒 냉장고 비밀번호</b>
-          <span>${l ? esc(l.name) + ' 냉장고 · ' : ''}${+m.pin.slot}번 칸${l ? ` <span class="muted">(${esc(l.place)})</span>` : ''}</span>
-          <span class="code num">${esc(m.pin.code)}</span>
-          ${m.pin.until ? `<span>${esc(m.pin.until)} 가져가 주세요.</span>` : ''}
-          ${nv ? `<a class="btn sm primary" href="${esc(nv.kakao)}" target="_blank" rel="noopener">카카오맵 길찾기</a>` : ''}
-        </div><time>${esc(ago(m.at))}</time></li>`;
-      }
       return `<li class="msg ${mine ? 'me' : ''}"><p>${esc(m.text)}</p><time>${esc(ago(m.at))}</time></li>`;
     }).join('');
-    const quick = iSell ? ['네, 있어요. 넣어 드릴게요.', '냉장고에 넣었어요.', '오늘은 다 팔렸어요. 죄송해요.'] : ['가져갔어요. 고맙습니다!', '몇 시에 넣어 주세요?'];
-    const p = ui.chat.pin;
-    const pinPanel = iSell && lk ? (ui.chat.pinOpen ? `<div class="pin-box">
-        <h3>🔒 이 손님에게만 비밀번호 보내기</h3>
-        <p class="small" style="margin:0"><b>${esc(lk.name)} 냉장고 ${+post.locker.slot}번 칸</b>에 넣고 자물쇠를 아래 번호로 맞춰 잠근 뒤 보내세요.</p>
-        <div class="grid2">
-          <label class="field">비밀번호<span class="row" style="flex-wrap:nowrap;gap:6px"><input type="text" id="pin-code" class="num" inputmode="numeric" maxlength="6" value="${esc(p.code)}"><button type="button" class="btn sm" data-act="pin-new" aria-label="새 비밀번호 만들기">↻</button></span></label>
-          <label class="field">가져갈 시간<input type="text" id="pin-until" value="${esc(p.until)}"></label>
-        </div>
-        <div class="row"><button type="button" class="btn primary" data-act="pin-send">채팅으로 보내기</button><button type="button" class="btn" data-act="pin-close">닫기</button></div>
-        <p class="muted small" style="margin:0">손님이 가져가면 자물쇠 번호를 바꿔 주세요.</p>
-      </div>` : `<button type="button" class="btn primary" data-act="pin-open">🔒 냉장고 비밀번호 보내기</button>`) : '';
+    const quick = iSell ? ['네, 있어요. 챙겨 둘게요.', '오늘은 다 팔렸어요. 죄송해요.'] : ['잘 받았어요. 고맙습니다!', '언제 받을 수 있을까요?'];
     return `<div class="chat-head">
         <button type="button" class="btn sm" data-act="chat-back">← 채팅 목록</button>
-        <div class="grow"><b>${esc(iSell ? t.buyerAlias : t.sellerAlias)}</b><span class="muted small">${esc(chatTitle(t))}${lk ? ' · ' + esc(lk.name) + ' 냉장고 ' + (+post.locker.slot) + '번 칸' : ''}</span></div>
+        <div class="grow"><b>${esc(iSell ? t.buyerAlias : t.sellerAlias)}</b><span class="muted small">${esc(chatTitle(t))}</span></div>
         <span class="pill info">익명</span>
       </div>
       <ul class="msgs" aria-live="polite">${msgs || '<li class="muted small" style="text-align:center;list-style:none">첫 글을 보내 보세요. 이름과 전화번호는 보이지 않아요.</li>'}</ul>
-      ${pinPanel}
       <div class="quick-replies">${quick.map((q) => `<button type="button" class="chip" data-act="chat-quick" data-v="${esc(q)}">${esc(q)}</button>`).join('')}</div>
       <div class="chat-input">
         <textarea id="chat-text" rows="2" placeholder="채팅을 적어 주세요" aria-label="채팅 글">${esc(ui.chat.draft)}</textarea>
@@ -302,41 +275,6 @@
     </article>`;
   }
 
-  /* ---------- 무인 냉장고 ---------- */
-  const lockerOf = (p) => (p.locker && A.locker(p.locker.id)) || null;
-  function lockerLine(p) {
-    const l = lockerOf(p); if (!l) return '';
-    return `<div class="locker">
-      <span class="lk-badge" aria-hidden="true">🧊</span>
-      <div class="grow"><b>${esc(l.name)} 냉장고 · ${+p.locker.slot}번 칸</b><span class="muted small">${esc(l.place)}</span></div>
-      <div class="row" style="gap:6px;flex-wrap:nowrap"><button type="button" class="btn sm" data-act="lk-show" data-v="${esc(l.id)}">지도</button><a class="btn sm" href="${esc(A.navLinks(l).kakao)}" target="_blank" rel="noopener">길찾기</a></div>
-    </div>`;
-  }
-  // 손님 화면 지도: render() 때마다 새 화면에 다시 붙임 (Leaflet + OpenStreetMap)
-  let lkMap = null;
-  function mountMap() {
-    if (lkMap) { lkMap.remove(); lkMap = null; }
-    const el = $('#lk-map'); if (!el) return;
-    if (!window.L) { el.innerHTML = '<p class="muted small" style="padding:14px;margin:0">지도를 불러오지 못했어요. 아래 목록의 길찾기를 눌러 주세요.</p>'; return; }
-    const lks = A.lockersIn(ui.region);
-    lkMap = L.map(el, { scrollWheelZoom: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '&copy; OpenStreetMap' }).addTo(lkMap);
-    const marks = {};
-    lks.forEach((l) => {
-      const items = S.posts.filter((p) => p.locker && p.locker.id === l.id && p.status !== 'sold');
-      const nv = A.navLinks(l);
-      // 핀은 번호만 (가까운 냉장고끼리 이름표가 겹치지 않게), 이름은 팝업과 아래 목록에
-      const icon = L.divIcon({ className: 'lk-pin', html: `<span aria-label="${esc(l.name)}">${esc(l.name.split('-')[1] || l.name)}${items.length ? `<i>${items.length}</i>` : ''}</span>`, iconSize: [0, 0], iconAnchor: [0, 0] });
-      marks[l.id] = L.marker(l.at, { icon, title: l.name + ' 냉장고' }).addTo(lkMap).bindPopup(`<div class="lk-pop"><b>${esc(l.name)} 무인 냉장고</b><span>${esc(l.place)}</span>
-        <span>${items.length ? items.map((p) => esc(A.label(p.species, p.variety)) + ' ' + (+p.locker.slot) + '번 칸').join(', ') : '지금은 비어 있어요'}</span>
-        <span><a href="${esc(nv.kakao)}" target="_blank" rel="noopener">카카오맵 길찾기</a> · <a href="${esc(nv.google)}" target="_blank" rel="noopener">구글 지도</a></span></div>`);
-    });
-    if (lks.length > 1) lkMap.fitBounds(L.latLngBounds(lks.map((l) => l.at)), { padding: [40, 40], maxZoom: 13 });
-    else if (lks.length) lkMap.setView(lks[0].at, 13);
-    if (ui.focusLocker && marks[ui.focusLocker]) { lkMap.setView(A.locker(ui.focusLocker).at, 14); marks[ui.focusLocker].openPopup(); }
-    ui.focusLocker = null;
-  }
-
   /* ---------- 후기 (해녀별 별점, 해녀는 계정으로 구분) ---------- */
   const sellerReviews = (p) => (S.reviews || []).filter((r) => r.seller === p.ownerId).sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt));
   // 게시판에 이미 있는 후기도 규칙에 걸리면 가리고 별점에서 뺌
@@ -356,7 +294,7 @@
     const form = owner || p.ownerId === DEV ? '' : `<div class="rev-form">
         <h3>${esc(p.author.alias)}에게 후기 남기기 <span class="muted small" style="font-weight:400">${esc(ME_ALIAS)}(으)로 올라가요</span></h3>
         <div class="star-pick" role="group" aria-label="별점 고르기">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-act="rev-star" data-v="${n}" aria-label="${n}점" aria-pressed="${n <= f.stars}">★</button>`).join('')}<span class="num">${f.stars}점</span></div>
-        <textarea id="rev-text" rows="3" placeholder="맛, 양, 신선도, 냉장고에서 찾기 쉬웠는지 적어 주세요. 아쉬운 점도 괜찮아요.">${esc(f.text)}</textarea>
+        <textarea id="rev-text" rows="3" placeholder="맛, 양, 신선도를 적어 주세요. 아쉬운 점도 괜찮아요.">${esc(f.text)}</textarea>
         ${f.msg ? `<div class="banner mod"><span aria-hidden="true">🛡️</span><div><b>${esc(f.msg.kind)} 때문에 올리지 않았어요.</b> ${esc(f.msg.reason)}${f.msg.suggestion ? `<div class="suggest">“${esc(f.msg.suggestion)}”</div><button type="button" class="btn sm" data-act="rev-use">이렇게 고쳐 쓰기</button>` : ' 불만이 있었다면 무엇이 아쉬웠는지 사실대로 적어 주세요.'}</div></div>` : ''}
         <button type="button" class="btn primary" data-act="rev-save" data-id="${esc(p.id)}" ${f.busy ? 'disabled' : ''}>${f.busy ? 'AI가 살펴보는 중…' : '후기 올리기'}</button>
         <p class="muted small" style="margin:0">🛡️ AI 도우미가 욕설과 일방적인 비방은 걸러 내요. 맛·양·신선도에 대한 솔직한 불만은 그대로 올라가요.</p>
@@ -379,7 +317,7 @@
   function postCard(p, owner, i) {
     const sp = SP[p.species];
     const sold = p.status === 'sold';
-    const lk = lockerOf(p), rt = rating(p), nRev = sellerReviews(p).length, revOpen = ui.rev.postId === p.id;
+    const rt = rating(p), nRev = sellerReviews(p).length, revOpen = ui.rev.postId === p.id;
     const nChat = S.chats.filter((c) => c.ref.type === 'post' && c.ref.id === p.id).length;
     const ownerBtns = `<div class="row">
         ${nChat ? `<button type="button" class="btn primary sm" data-act="tab" data-v="chat">💬 이 글 채팅 ${nChat}개</button>` : ''}
@@ -397,13 +335,12 @@
       ${p.photo ? `<img class="photo" src="${esc(p.photo)}" alt="${esc(sp.ko)} 사진">` : ''}
       <div class="post-t"><h2>${esc(A.label(p.species, p.variety))} <span class="muted">${esc(p.grade)}등급 · 신선도 ${esc(p.freshness)}</span></h2>${sold ? '<span class="pill off">다 팔렸어요</span>' : '<span class="pill ok">있어요</span>'}</div>
       <div class="kv">${(p.author && (p.author.region || A.regionOf(p.author.village))) ? `<span>${esc(regionName(p.author.region || A.regionOf(p.author.village)))}${A.isSpecial(p.author.region || A.regionOf(p.author.village), p.species) ? ' 특산' : ''}</span>` : ''}<span>${esc(ago(p.createdAt))} 올림</span><span>양 <b>${kg(p.weightKg)}</b></span>${p.example ? '<span class="pill info">예시 글</span>' : ''}</div>
-      ${lockerLine(p)}
       ${p.promo ? `<p class="promo">${esc(p.promo)}</p>` : ''}
       <div class="row between" style="align-items:flex-end">
         ${p.askPerKg ? `<div class="price num" style="font-size:32px">${won(p.askPerKg).replace('원', '')}<small>원 / kg</small></div>` : '<strong>가격은 채팅으로 물어보세요</strong>'}
         ${p.refPerKg ? `<span class="muted small">참고 시세 kg당 ${won(p.refPerKg)}${p.refLive ? ' (aT)' : ''}</span>` : ''}
       </div>
-      ${owner ? ownerBtns : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 채팅으로 물어보세요.</p>' : '') + chatBox({ type: 'post', id: p.id }, A.label(p.species, p.variety), p.ownerId, p.author, lk)}
+      ${owner ? ownerBtns : (sold ? '<p class="muted small" style="margin:0">이번 것은 다 팔렸어요. 다음 물질 때 채팅으로 물어보세요.</p>' : '') + chatBox({ type: 'post', id: p.id }, A.label(p.species, p.variety), p.ownerId, p.author)}
       <button type="button" class="rev-toggle" data-act="rev-open" data-id="${esc(p.id)}" aria-expanded="${revOpen}">${rt ? `<span class="stars">★</span> ${rt.avg.toFixed(1)} · ` : ''}후기 ${nRev}개 ${revOpen ? '접기' : owner ? '보기' : '보기 · 쓰기'}</button>
       ${revOpen ? reviewsBlock(p, owner) : ''}
     </article>`;
@@ -483,21 +420,6 @@
         <div class="row between"><div class="eyebrow">홍보 글</div><button type="button" class="btn sm" data-act="rewrite" ${d.rewriting ? 'disabled' : ''}>${d.rewriting ? '쓰는 중…' : 'AI가 다시 쓰기'}</button></div>
         <label class="field" for="promo">손님에게 보일 글 (고쳐도 돼요)<textarea id="promo" rows="6">${esc(d.promo)}</textarea></label>
       </section>
-      ${(() => {
-        const lks = A.lockersIn(myRegion());
-        if (d.locker === undefined) d.locker = lks.length ? { id: lks[0].id, slot: 1 } : null;
-        const cur = d.locker && A.locker(d.locker.id);
-        return `<section class="card">
-        <div class="eyebrow">🧊 받는 곳</div>
-        <h3>어느 냉장고에 넣을까요?</h3>
-        <div class="chips">${lks.map((l) => `<button type="button" class="chip" data-act="d-locker" data-v="${esc(l.id)}" aria-pressed="${!!cur && cur.id === l.id}">${esc(l.name)}</button>`).join('')}<button type="button" class="chip" data-act="d-locker" data-v="" aria-pressed="${!cur}">직접 만나기</button></div>
-        ${cur ? `<p class="muted small" style="margin:0">${esc(cur.place)}</p>
-        <h3>몇 번 칸?</h3>
-        <div class="chips">${Array.from({ length: cur.slots }, (_, k) => k + 1).map((n) => `<button type="button" class="chip" data-act="d-slot" data-v="${n}" aria-pressed="${d.locker.slot === n}">${n}번</button>`).join('')}</div>
-        <p class="small" style="margin:0">🔒 손님이 채팅으로 주문하면 이 칸에 넣고 잠근 뒤, <b>채팅</b>에서 ‘냉장고 비밀번호 보내기’를 누르세요. 손님과 만나지 않아도 돼요.</p>`
-        : `<p class="muted small" style="margin:0">받는 곳과 시간은 손님과 채팅으로 정해요. 안전을 위해 냉장고를 권해요.</p>`}
-      </section>`;
-      })()}
       <section class="card">
         <div class="eyebrow">손님에게 보이는 나</div>
         <div class="kv"><span><b>${esc(ME_ALIAS)}</b></span><span>${esc(regionName(myRegion()))} 해녀</span>${ui.me.hours ? `<span>판매 시간 <b>${esc(ui.me.hours)}</b></span>` : ''}</div>
@@ -545,10 +467,10 @@
       <section class="card">
         <div class="eyebrow">손님에게 보이는 이름</div>
         <div class="alias-big">${esc(ME_ALIAS)}</div>
-        <p class="muted small" style="margin:0">🔒 삼촌 이름과 전화번호는 해녀바당에 저장하지 않고 손님에게도 보이지 않아요. 손님과는 채팅으로만 이야기하고, 해산물은 무인 냉장고로 주고받아요.</p>
+        <p class="muted small" style="margin:0">🔒 삼촌 이름과 전화번호는 해녀바당에 저장하지 않고 손님에게도 보이지 않아요. 손님과는 채팅으로만 이야기해요.</p>
       </section>
       <section class="card">
-        <label class="field">지역 <span class="muted small" style="font-weight:400">특산품 추천·지역 물가·냉장고 고르기에 써요</span><select id="me-region">${Object.entries(A.REGIONS).map(([k, r]) => `<option value="${k}"${k === myRegion() ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
+        <label class="field">지역 <span class="muted small" style="font-weight:400">특산품 추천·지역 물가에 써요</span><select id="me-region">${Object.entries(A.REGIONS).map(([k, r]) => `<option value="${k}"${k === myRegion() ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></label>
         <label class="field">판매 시간 <span class="muted small" style="font-weight:400">선택, 손님에게 보여요</span><input type="text" id="me-hours" value="${esc(m.hours || '')}" placeholder="물질 끝나고 오후 3~5시"></label>
         <button type="button" class="btn primary big" data-act="me-save">저장</button>
       </section>`;
@@ -560,8 +482,7 @@
     const R = ui.region, here = (p) => (p.author.region || A.regionOf(p.author.village)) === R;
     // 순서: 먼저 보기 → 우리 지역 특산품 → 우리 지역 → 다른 지역 → 다 팔린 것
     const rank = (p) => (isEarly(p) && canSeeEarly(p) ? 0 : p.status === 'sold' ? 9 : here(p) ? (A.isSpecial(R, p.species) ? 1 : 2) : 3);
-    const lkOnly = ui.lkFilter && A.locker(ui.lkFilter);   // 지도에서 "들어 있는 해산물 보기"로 온 경우
-    const list = S.posts.filter((p) => (ui.filter === 'all' || p.species === ui.filter) && (!lkOnly || (p.locker && p.locker.id === lkOnly.id && p.status !== 'sold')))
+    const list = S.posts.filter((p) => ui.filter === 'all' || p.species === ui.filter)
       .sort((a, b) => rank(a) - rank(b) || new Date(b.createdAt) - new Date(a.createdAt));
     const specials = (A.REGIONS[R] || { specials: [] }).specials.map(([k, v]) => {
       const n = S.posts.filter((p) => p.species === k && p.status !== 'sold' && here(p)).length;
@@ -577,56 +498,14 @@
           <button type="button" class="cal-btn" data-act="open-resv" aria-label="먼저 보기 예약${myWants().length ? ', 예약 ' + myWants().length + '개' : ''}" title="먼저 보기 예약"><span aria-hidden="true">📅</span>${arrived ? `<span class="badge num">${arrived}</span>` : myWants().length ? '<i class="cal-dot"></i>' : ''}</button>
         </div>
         <h1>오늘,<br>바다에서<br><em>왔습니다.</em></h1>
-        <p class="lede">해녀 삼촌이 숨 참고 따 온 해산물을 사진 그대로 알려 드려요. 이름·전화번호 없이 채팅으로 주문하고, 무인 냉장고에서 받아 가세요.</p>
-        <div class="trust"><span>수수료 <b>0원</b></span><span>익명 채팅</span><span>무인 냉장고</span></div>
+        <p class="lede">해녀 삼촌이 숨 참고 따 온 해산물을 사진 그대로 알려 드려요. 이름·전화번호 없이 채팅으로 주문하세요.</p>
+        <div class="trust"><span>수수료 <b>0원</b></span><span>익명 채팅</span><span>직접 거래</span></div>
         ${coverArt}
       </section>
       <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
       <section class="card special"><div class="eyebrow">★ ${esc(regionName(R))} 특산품 추천</div><div class="sp-grid">${specials}</div><p class="muted small" style="margin:0">있는 건 눌러서 보고, 없는 건 예약해 두면 올라올 때 먼저 보여 드려요.</p></section>
-      ${lockerTeaser(R)}
       <div class="chips"><button type="button" class="chip" data-act="filter" data-v="all" aria-pressed="${ui.filter === 'all'}">전체</button>${kinds.map((k) => `<button type="button" class="chip" data-act="filter" data-v="${k}" aria-pressed="${ui.filter === k}">${esc(SP[k].ko)}</button>`).join('')}</div>
-      ${lkOnly ? `<div class="notice row between" style="flex-wrap:nowrap"><span>🧊 ${esc(lkOnly.name)} 냉장고에 들어 있는 것만 보는 중</span><button type="button" class="btn sm" data-act="lk-all">모두 보기</button></div>` : ''}
       ${list.length ? list.map((p, i) => (isEarly(p) && !canSeeEarly(p) ? teaser(p) : postCard(p, false, i))).join('') : '<div class="empty">아직 올라온 해산물이 없어요. 물질 끝나는 오후에 다시 봐 주세요.</div>'}`;
-  }
-
-  // 해산물 화면에서 지도 탭으로 가는 바로가기
-  function lockerTeaser(R) {
-    const lks = A.lockersIn(R);
-    if (!lks.length) return '';
-    const n = S.posts.filter((p) => p.status !== 'sold' && p.locker && lks.some((l) => l.id === p.locker.id)).length;
-    return `<button type="button" class="card lk-teaser" data-act="tab" data-v="map"><span class="lk-badge" aria-hidden="true">🧊</span>
-        <span class="grow"><b>${esc(regionName(R))} 무인 냉장고 ${lks.length}곳</b><span class="muted small">지금 ${n}가지 들어 있어요 · 지도에서 길찾기</span></span><span class="go" aria-hidden="true">→</span></button>`;
-  }
-
-  /* ---------- 지도 탭 (해녀·손님 모두) ---------- */
-  const inLocker = (id) => S.posts.filter((p) => p.locker && p.locker.id === id && p.status !== 'sold');
-  function lockerCard(l, haenyeo) {
-    const inside = inLocker(l.id), nv = A.navLinks(l);
-    const slots = Array.from({ length: l.slots }, (_, k) => k + 1).map((n) => {
-      const p = inside.find((x) => +x.locker.slot === n);
-      return `<span class="slot${p ? ' on' : ''}${p && p.ownerId === DEV ? ' mine' : ''}"><b>${n}</b>${p ? esc(SP[p.species].ko) + (p.ownerId === DEV ? ' · 내 것' : '') : '빈 칸'}</span>`;
-    }).join('');
-    return `<article class="card lk-card">
-        <div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
-          <button type="button" class="lk-name" data-act="lk-show" data-v="${esc(l.id)}"><b>${esc(l.name)} 냉장고</b><span>${esc(l.place)}</span></button>
-          <span class="pill ${inside.length ? 'ok' : 'off'}">${inside.length ? inside.length + '가지 있어요' : '비어 있어요'}</span>
-        </div>
-        <div class="slots" aria-label="칸 ${l.slots}개">${slots}</div>
-        <div class="row">
-          <a class="btn sm primary" href="${esc(nv.kakao)}" target="_blank" rel="noopener">카카오맵 길찾기</a>
-          <a class="btn sm" href="${esc(nv.google)}" target="_blank" rel="noopener">구글 지도</a>
-          ${!haenyeo && inside.length ? `<button type="button" class="btn sm" data-act="lk-items" data-v="${esc(l.id)}">들어 있는 해산물 보기</button>` : ''}
-        </div>
-      </article>`;
-  }
-  function mapView() {
-    const R = ui.region, lks = A.lockersIn(R), h = ui.role === 'h';
-    return `<div class="stack" style="gap:8px"><div class="eyebrow">🧊 만나지 않고 주고받는 무인 냉장고</div><h1>냉장고 지도</h1>
-        <p class="muted" style="margin:0">${h ? '어느 냉장고에 빈 칸이 있는지 보세요. 넣고 잠근 뒤 비밀번호는 산 손님에게만 문자로 보내요.' : '삼촌이 냉장고 칸에 넣고 잠가 두면, 주문한 손님에게만 비밀번호가 문자로 가요. 냉장고를 눌러 길을 찾으세요.'}</p></div>
-      <div class="region-bar"><span class="muted small">지역</span>${Object.entries(A.REGIONS).map(([k, r]) => `<button type="button" class="chip" data-act="region" data-v="${k}" aria-pressed="${k === R}">${esc(r.name)}</button>`).join('')}<button type="button" class="chip" data-act="geo">📍 내 위치</button></div>
-      <div id="lk-map" class="lk-map big" role="region" aria-label="${esc(regionName(R))} 무인 냉장고 지도"></div>
-      ${lks.length ? lks.map((l) => lockerCard(l, h)).join('') : '<div class="empty">이 지역에는 아직 냉장고가 없어요.</div>'}
-      <p class="muted small" style="margin:0">냉장고 위치는 시연용 예시예요. 실제 설치 장소는 어촌계와 정해요.</p>`;
   }
 
   /* ---------- 손님: 먼저 보기 예약 ---------- */
@@ -671,14 +550,12 @@
       { id: 'upload', label: '올리기', icon: I.camera, view: hUpload },
       { id: 'mine', label: '내 글', icon: I.list, view: hMine, badge: () => S.posts.filter((p) => p.ownerId === DEV && p.status !== 'sold').length },
       { id: 'chat', label: '채팅', icon: I.chat, view: chatView, badge: unreadAll },
-      { id: 'map', label: '지도', icon: I.map, view: mapView },
       { id: 'exp', label: '체험', icon: I.people, view: hExp },
       { id: 'me', label: '내 정보', icon: I.user, view: hMe }
     ],
     c: [
       { id: 'market', label: '해산물', icon: I.shop, view: cMarket, badge: () => S.posts.filter((p) => p.status !== 'sold').length },
       { id: 'chat', label: '채팅', icon: I.chat, view: chatView, badge: unreadAll },
-      { id: 'map', label: '지도', icon: I.map, view: mapView },
       { id: 'exp', label: '체험', icon: I.people, view: cExp }
     ]
   };
@@ -702,7 +579,6 @@
     const y = window.scrollY;
     $('#view').innerHTML = cur.view();
     window.scrollTo(0, y);
-    mountMap();
   }
 
   /* ---------- 사진 ---------- */
@@ -750,8 +626,7 @@
       if (ai.isSeafood === false) ai.notes = '해산물이 잘 안 보여요. 다시 찍거나 아래에서 직접 골라 주세요. ' + (ai.notes || '');
       Object.assign(d, {
         status: 'ready', ai, species: ai.species, variety: (typeof ai.variety === 'string' && ai.variety.trim() && !/모름|없음|unknown/i.test(ai.variety)) ? ai.variety.trim().slice(0, 20) : null, grade: ai.grade, freshness: ai.freshness,
-        weightKg: Math.max(0.5, Math.round((ai.estWeightKg || 1) * 2) / 2),
-        locker: (() => { const l = A.lockersIn(myRegion())[0]; return l ? { id: l.id, slot: 1 } : null; })()
+        weightKg: Math.max(0.5, Math.round((ai.estWeightKg || 1) * 2) / 2)
       });
       d.askPerKg = A.refPrice(rp(d)) || null;
       d.promo = ai.promo || A.promo(Object.assign({ author: myAuthor() }, d));
@@ -765,7 +640,7 @@
     if (!CONFIG.gemini) { d.variant++; d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant); render(); return; }
     d.rewriting = true; render();
     const prompt = `제주 해녀가 직접 잡은 해산물 홍보 글을 새로 써라.
-품목: ${A.label(d.species, d.variety)}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 지역: ${regionName(myRegion())} 앞바다, 받는 곳: ${d.locker && A.locker(d.locker.id) ? A.locker(d.locker.id).name + ' 무인 냉장고' : '채팅으로 정함'}, 판매 시간: ${ui.me.hours || '없음'}.
+품목: ${A.label(d.species, d.variety)}, 등급: ${d.grade}, 신선도: ${d.freshness}, 양: ${d.weightKg}kg, 지역: ${regionName(myRegion())} 앞바다, 받는 곳: 채팅으로 정함, 판매 시간: ${ui.me.hours || '없음'}.
 익명 게시판이라 해녀 이름·마을 이름·전화번호는 절대 쓰지 말고 "해녀 삼촌"이라고만 쓴다. 연락은 "채팅"으로 하라고 쓴다.
 홍보 글 규칙: 카카오톡 단체방·밴드에 올릴 진짜 홍보 글처럼 쓴다.
 1줄: 【】 안에 눈길 끄는 한 줄 (15자 안팎, 예: 【오늘 아침 막 올라온 홍해삼】, 【양식 아니고, 해녀가 직접 땄어요】)
@@ -815,15 +690,13 @@
     if (e.target.id === 'rv-text') { ui.rv.text = e.target.value; $('#rv-detect').innerHTML = detectLine(e.target.value); }
     if (e.target.id === 'rev-text') ui.rev.text = e.target.value;
     if (e.target.id === 'chat-text') ui.chat.draft = e.target.value;
-    if (e.target.id === 'pin-code') ui.chat.pin.code = e.target.value.replace(/\D/g, '');
-    if (e.target.id === 'pin-until') ui.chat.pin.until = e.target.value;
   });
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const act = b.dataset.act, v = b.dataset.v, d = ui.draft;
     switch (act) {
       case 'logout': try { localStorage.removeItem('haenyeo_session'); } catch { /* 저장 안 되는 환경 */ } location.reload(); break;
-      case 'tab': ui.tab[ui.role] = v; ui.delArm = null; ui.lkFilter = null; if (v === 'chat') Object.assign(ui.chat, { id: null, pending: null, pinOpen: false }); render(); window.scrollTo(0, 0); break;
+      case 'tab': ui.tab[ui.role] = v; ui.delArm = null; if (v === 'chat') Object.assign(ui.chat, { id: null, pending: null }); render(); window.scrollTo(0, 0); break;
       case 'filter': ui.filter = v; render(); break;
       case 'dismiss-post': ui.lastPost = null; render(); break;
       case 'retake': ui.draft = { status: 'idle' }; render(); break;
@@ -845,8 +718,7 @@
               id: A.uid('p'), ownerId: DEV, author: myAuthor(),
               species: d.species, variety: d.variety || null, grade: d.grade, freshness: d.freshness, weightKg: d.weightKg,
               refPerKg: A.refPrice(rp(d)), refLive: A.basePerKg(d.species, d.variety).live, askPerKg: d.askPerKg, photo: d.photo || null,
-              promo: d.promo, createdAt: new Date().toISOString(), status: 'open',
-              locker: d.locker ? { id: d.locker.id, slot: d.locker.slot } : null
+              promo: d.promo, createdAt: new Date().toISOString(), status: 'open'
             };
             const ws = s.wants.filter((w) => !w.matchedPostId && ((w.species || []).includes(post.species) || (post.species === 'other' && post.variety && String(w.text || '').includes(post.variety))));
             if (ws.length) { post.earlyUntil = new Date(Date.now() + A.EARLY_MIN * 60000).toISOString(); ws.forEach((w) => { w.matchedPostId = post.id; }); }
@@ -914,29 +786,15 @@
         break;
       }
       case 'pg-del': run(() => mutate((s) => { s.programs = s.programs.filter((x) => x.id !== b.dataset.id); })); break;
-      /* 무인 냉장고 */
-      case 'd-locker':
-        d.locker = v ? { id: v, slot: 1 } : null;
-        if (!d.ai.promo) d.promo = A.promo(Object.assign({ author: myAuthor() }, d), d.variant);   // 기본 틀 글이면 받는 곳 줄도 바꿈
-        render(); break;
-      case 'd-slot': if (d.locker) d.locker.slot = +v; render(); break;
-      case 'lk-show': {
-        const l = A.locker(v); if (!l) break;
-        ui.region = l.region; if (ui.role === 'c') store.set('hb2-region', l.region);
-        ui.focusLocker = v; ui.tab[ui.role] = 'map'; render(); window.scrollTo(0, 0);
-        break;
-      }
-      case 'lk-items': ui.lkFilter = v; ui.filter = 'all'; ui.tab.c = 'market'; render(); window.scrollTo(0, 0); break;
-      case 'lk-all': ui.lkFilter = null; render(); break;
       /* 채팅 */
       case 'chat-start': openChat({ type: b.dataset.type, id: b.dataset.id }); break;
       case 'chat-want': openChat({ type: 'want', id: b.dataset.id }); break;
       case 'chat-open': {
         const c = S.chats.find((x) => x.id === b.dataset.id); if (!c) break;
-        Object.assign(ui.chat, { id: c.id, pending: null, draft: '', pinOpen: false });
+        Object.assign(ui.chat, { id: c.id, pending: null, draft: '' });
         markSeen(c); render(); window.scrollTo(0, document.body.scrollHeight); break;
       }
-      case 'chat-back': Object.assign(ui.chat, { id: null, pending: null, draft: '', pinOpen: false }); render(); window.scrollTo(0, 0); break;
+      case 'chat-back': Object.assign(ui.chat, { id: null, pending: null, draft: '' }); render(); window.scrollTo(0, 0); break;
       case 'chat-quick': ui.chat.draft = v; render(); { const ta = $('#chat-text'); if (ta) ta.focus(); } break;
       case 'chat-send': {
         const ta = $('#chat-text'); if (ta) ui.chat.draft = ta.value;
@@ -944,22 +802,6 @@
         b.disabled = true;
         run(async () => { await sendMsg({ text: chk.text }); ui.chat.draft = ''; render(); window.scrollTo(0, document.body.scrollHeight); })
           .finally(() => { b.disabled = false; });
-        break;
-      }
-      // 냉장고 비밀번호: 이 채팅의 손님에게만 (전화번호 없이)
-      case 'pin-open': ui.chat.pinOpen = true; ui.chat.pin = { code: A.newPin(), until: ui.chat.pin.until || '오늘 저녁 8시까지' }; render(); break;
-      case 'pin-close': ui.chat.pinOpen = false; render(); break;
-      case 'pin-new': ui.chat.pin.code = A.newPin(); render(); break;
-      case 'pin-send': {
-        const c = S.chats.find((x) => x.id === ui.chat.id) || ui.chat.pending, p = c && refPost(c), l = p && lockerOf(p);
-        if (!l) break;
-        const code = String(ui.chat.pin.code || '').replace(/\D/g, '');
-        if (code.length < 4) { toast('비밀번호를 4자리 이상으로 적어 주세요.'); break; }
-        run(async () => {
-          await sendMsg({ kind: 'pin', text: '🔒 냉장고 비밀번호', pin: { locker: l.id, slot: +p.locker.slot, code, until: ui.chat.pin.until } });
-          ui.chat.pinOpen = false; render(); window.scrollTo(0, document.body.scrollHeight);
-          toast('비밀번호를 이 손님에게만 보냈어요.');
-        });
         break;
       }
       /* 후기 */

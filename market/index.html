@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Cormorant+Garamond:ital,wght@1,500;1,600&display=swap">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="/market/app.css">
 <header class="top">
   <div class="top-in">
@@ -59,7 +58,7 @@
     <form id="signupForm" class="card" novalidate>
       <fieldset class="type-pick">
         <legend>회원 종류</legend>
-        <label class="type-card"><input type="radio" name="userType" value="general" checked><b>손님</b><span>해산물을 보고 냉장고에서 받아 가요</span></label>
+        <label class="type-card"><input type="radio" name="userType" value="general" checked><b>손님</b><span>해산물을 보고 채팅으로 주문해요</span></label>
         <label class="type-card"><input type="radio" name="userType" value="haenyeo"><b>해녀</b><span>잡은 해산물을 찍어서 알려요</span></label>
       </fieldset>
       <p class="field-error" id="errUserType" hidden>회원 종류를 골라 주세요.</p>
@@ -81,7 +80,6 @@
   <p class="muted small" style="margin:0;text-align:center">데모 모드: 회원 정보는 이 기기 브라우저에만 저장돼요.</p>
 </main>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/market/auth.js"></script>
 <script src="/market/agents.js"></script>
 <script src="/market/app.js"></script>

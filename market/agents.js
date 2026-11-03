@@ -148,7 +148,7 @@
     gulfweed: '몸국 끓이기 딱 좋아요',
     ecklonia: '쌉싸름한 향이 좋아 무침으로 그만이에요'
   };
-  function promo({ species, variety, grade, freshness, weightKg, author, locker: box }, variant) {
+  function promo({ species, variety, grade, freshness, weightKg, author }, variant) {
     const ko = label(species, variety);
     // 익명: 해녀 이름·마을·만나는 곳은 쓰지 않고 지역 바다만 씀
     const sea = ((author && REGIONS[author.region]) || REGIONS.jeju).name + ' 앞바다';
@@ -156,9 +156,7 @@
     const alive = freshness === '최상' ? '아직 살아서 꿈틀거려요' : freshness === '보통' ? '오늘 안에 드시는 걸 권해요' : '오늘 아침 물질한 거라 싱싱해요';
     const top = grade === '특' ? '큰 놈들로만 골랐어요' : grade === '상' ? '알 좋은 걸로 골랐어요' : '집에서 편하게 드시기 좋은 크기예요';
     const when = author && author.hours ? author.hours : '';
-    const lk = box && LOCKERS.find((l) => l.id === box.id);
-    const pickup = lk ? `\n🧊 ${lk.name} 무인 냉장고(${lk.place})에서 비밀번호로 가져가세요`
-      : when ? `\n⏰ ${when}` : '';
+    const pickup = when ? `\n⏰ ${when}` : '';
     const v = [
       `【오늘 ${sea}에서 막 올라온 ${ko}】\n해녀 삼촌이 숨 참고 한 개 한 개 따 온 ${ko}${josa(ko, '이에요', '예요')}. ${alive}. ${taste}.\n오늘 들어온 건 ${weightKg}kg뿐이에요. 다 나가면 다음 물질 때까지 없어요.${pickup}`,
       `【양식 아니고, 해녀가 직접 땄어요】\n${sea} ${ko}, ${top}. ${taste}.\n중간 상인 없이 바다에서 바로 식탁으로 가요. 먼저 채팅 주시는 분께 드려요.${pickup}`,
@@ -231,30 +229,6 @@
   const itemFactor = (region, species) => (ITEM_INDEX[species] || {})[region] || null;
   const regionFactor = (region, species) => itemFactor(region, species) || REGION_INDEX[region] || 1;
 
-  /* ---------- 무인 냉장고: 만나지 않고 주고받기 ---------- */
-  // 해녀가 냉장고 칸에 넣고 자물쇠를 잠근 뒤, 비밀번호는 산 손님에게만 문자로 보냄 (해녀 신변 보호)
-  // 위치는 시연용 예시(아직 설치 전). 좌표는 항구·어촌계 근처 대략값이라 설치하면 실제 값으로 바꿔야 함
-  const LOCKERS = [
-    { id: 'jeju-1', name: '제주-1', region: 'jeju', place: '구좌읍 하도리 해녀박물관 근처', at: [33.5232, 126.8625], slots: 6 },
-    { id: 'jeju-2', name: '제주-2', region: 'jeju', place: '구좌읍 종달리 포구 근처', at: [33.4987, 126.9033], slots: 6 },
-    { id: 'jeju-3', name: '제주-3', region: 'jeju', place: '서귀포 법환포구 근처', at: [33.2357, 126.5145], slots: 4 },
-    { id: 'busan-1', name: '부산-1', region: 'busan', place: '기장 대변항 근처', at: [35.2227, 129.2299], slots: 4 },
-    { id: 'ulsan-1', name: '울산-1', region: 'ulsan', place: '북구 정자항 근처', at: [35.6219, 129.4519], slots: 4 },
-    { id: 'gyeongbuk-1', name: '경북-1', region: 'gyeongbuk', place: '포항 구룡포항 근처', at: [35.9896, 129.5566], slots: 4 },
-    { id: 'gangwon-1', name: '강원-1', region: 'gangwon', place: '속초 동명항 근처', at: [38.2105, 128.6006], slots: 4 },
-    { id: 'gyeongnam-1', name: '경남-1', region: 'gyeongnam', place: '거제 지세포항 근처', at: [34.8318, 128.7116], slots: 4 },
-    { id: 'jeonnam-1', name: '전남-1', region: 'jeonnam', place: '완도항 근처', at: [34.3110, 126.7550], slots: 4 },
-    { id: 'chungnam-1', name: '충남-1', region: 'chungnam', place: '태안 신진도항 근처', at: [36.6774, 126.1347], slots: 4 }
-  ];
-  const locker = (id) => LOCKERS.find((l) => l.id === id) || null;
-  const lockersIn = (region) => LOCKERS.filter((l) => l.region === region);
-  // 길찾기: 카카오맵(앱이 있으면 앱으로 열림), 구글 지도
-  const navLinks = (l) => ({
-    kakao: `https://map.kakao.com/link/to/${encodeURIComponent(l.name + ' 해녀바당 냉장고')},${l.at[0]},${l.at[1]}`,
-    google: `https://www.google.com/maps/dir/?api=1&destination=${l.at[0]},${l.at[1]}`
-  });
-  const newPin = () => String(Math.floor(1000 + Math.random() * 9000));
-
   /* ---------- 후기 검사: 욕설·일방적 비방 거르기 ---------- */
   // 1차는 여기 규칙(욕설·비하·근거 없는 범죄 단정), 2차는 서버 AI(/api/moderate)가 문맥을 봄.
   // 맛·양·신선도·응대에 대한 불만이나 낮은 별점 같은 정당한 비판은 막지 않는다.
@@ -293,19 +267,16 @@
     const H1 = 'u:demo-haenyeo', H2 = 'seed-h2', G1 = 'u:demo-guest';
     const a1 = { alias: alias('haenyeo', H1), region: 'jeju', hours: EXAMPLE_ME.hours };
     const a2 = { alias: alias('haenyeo', H2), region: 'jeju', hours: '오전 11시~오후 2시' };
-    const mk = (owner, author, species, grade, freshness, weightKg, ask, hrs, status, box) => {
-      const locker = box ? { id: box[0], slot: box[1] } : null;
-      return {
-        id: uid('p'), ownerId: owner, example: true, author, species, grade, freshness, weightKg,
-        refPerKg: refPrice({ species, grade, freshness }), askPerKg: ask, photo: null,
-        promo: promo({ species, grade, freshness, weightKg, author, locker }, hrs), createdAt: h(hrs), status: status || 'open', locker
-      };
-    };
+    const mk = (owner, author, species, grade, freshness, weightKg, ask, hrs, status) => ({
+      id: uid('p'), ownerId: owner, example: true, author, species, grade, freshness, weightKg,
+      refPerKg: refPrice({ species, grade, freshness }), askPerKg: ask, photo: null,
+      promo: promo({ species, grade, freshness, weightKg, author }, hrs), createdAt: h(hrs), status: status || 'open'
+    });
     const posts = [
-      mk(H1, a1, 'abalone', '특', '최상', 3, 45000, 1, null, ['jeju-1', 2]),
-      mk(H2, a2, 'turban', '상', '좋음', 5, 13000, 2, null, ['jeju-2', 1]),
-      mk(H1, a1, 'seaweed', '상', '좋음', 4, null, 5, null, ['jeju-1', 4]),
-      mk(H2, a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold', ['jeju-2', 3])
+      mk(H1, a1, 'abalone', '특', '최상', 3, 45000, 1),
+      mk(H2, a2, 'turban', '상', '좋음', 5, 13000, 2),
+      mk(H1, a1, 'seaweed', '상', '좋음', 4, null, 5),
+      mk(H2, a2, 'octopus', '상', '좋음', 1.5, 25000, 26, 'sold')
     ];
     const rv = (post, stars, text, by, hrs) => ({ id: uid('r'), ownerId: by, example: true, postId: post.id, seller: post.ownerId, species: post.species, stars, text, alias: alias('general', by), createdAt: h(hrs), checked: 'rule' });
     const g = (k) => 'seed-g' + k;
@@ -313,9 +284,9 @@
       v: 2,
       posts,
       reviews: [
-        rv(posts[0], 5, '전복이 정말 커요. 냉장고에서 바로 찾아서 기다릴 필요가 없었어요.', g(1), 0.5),
+        rv(posts[0], 5, '전복이 정말 커요. 채팅으로 금방 답해 주셔서 좋았어요.', g(1), 0.5),
         rv(posts[0], 4, '맛은 좋았는데 생각보다 작은 게 두어 개 섞여 있었어요.', g(2), 0.8),
-        rv(posts[3], 5, '살짝 데쳐 먹었는데 부드럽고 달아요. 길찾기로 냉장고도 금방 찾았어요.', g(3), 20)
+        rv(posts[3], 5, '살짝 데쳐 먹었는데 부드럽고 달아요.', g(3), 20)
       ],
       wants: [
         { id: 'w-seed1', ownerId: g(4), example: true, alias: alias('general', g(4)), text: '성게알 0.5kg 정도, 주말에 받고 싶어요', species: ['urchinroe'], createdAt: h(20), matchedPostId: null },
@@ -326,8 +297,8 @@
         id: 'c-seed1', example: true, ref: { type: 'post', id: posts[0].id }, title: label('abalone'),
         sellerId: H1, sellerAlias: a1.alias, buyerId: G1, buyerAlias: alias('general', G1), createdAt: h(0.6), updatedAt: h(0.4),
         msgs: [
-          { id: 'm1', from: G1, text: '전복 1kg 주문하고 싶어요. 제주-1 냉장고로 받을게요.', at: h(0.6) },
-          { id: 'm2', from: H1, text: '네, 오후 4시에 2번 칸에 넣어 둘게요. 넣고 비밀번호 보내 드릴게요.', at: h(0.4) }
+          { id: 'm1', from: G1, text: '전복 1kg 주문하고 싶어요. 어떻게 받으면 될까요?', at: h(0.6) },
+          { id: 'm2', from: H1, text: '네, 챙겨 둘게요. 받는 곳과 시간은 채팅으로 정해요.', at: h(0.4) }
         ]
       }],
       programs: [
@@ -338,7 +309,7 @@
   }
 
   const api = { REGIONS, regionOf, nearestRegion, isSpecial, setRegionIndex, regionFactor, regionNote, label, VARIETIES, detect, ALIASES, SPECIES, GRADES, FRESH, MAX_POSTS, EARLY_MIN, WANT_DAYS, EXAMPLE_ME, uid, refPrice, promo, seed, setMarket, marketNote, basePerKg, MARKET,
-    LOCKERS, locker, lockersIn, navLinks, newPin, checkReview, maskPhone, digitsOf, aliasCode, alias };
+    checkReview, maskPhone, digitsOf, aliasCode, alias };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Agents = api;
 })(typeof window !== 'undefined' ? window : globalThis);
