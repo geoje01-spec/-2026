@@ -124,23 +124,36 @@ a{color:#10303A}a:hover{color:#0D1A1F}
         </div>
 
         <!-- ① 위급·SOS -->
-        <div style="background: #F7F2E8; border: 2px solid #FF7A3D; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="background: #F7F2E8; border: 2px solid #FF7A3D; border-radius: 10px; padding: 14px 18px; display: flex; flex-direction: column; gap: 10px">
           <div style="display: flex; align-items: center; gap: 10px">
             <span style="background: #FF7A3D; color: #0D1A1F; font-weight: 900; font-size: 13px; padding: 3px 10px; border-radius: 20px">가장 중요한 기능</span>
-            <b style="font-size: 19px">① 위급 상황 · SOS 자동 신고</b>
+            <b style="font-size: 19px">① 위급 상황 · SOS 자동 신고 알고리즘</b>
           </div>
-          <div style="display: grid; grid-template-columns: 150px 28px 170px 28px minmax(0, 1fr); align-items: center; row-gap: 10px">
-            <div style="background: #10303A; color: #F7F2E8; border-radius: 8px; padding: 10px; font-size: 13.5px; line-height: 1.4; grid-row: span 2; align-self: stretch; display: flex; flex-direction: column; justify-content: center"><b style="color: #F0C070">위급 상황 감지</b>오래 안 올라옴<br>충격 후 20초 무동작</div>
-            <div style="text-align: center; font-size: 16px; grid-row: span 2" aria-hidden="true">▶</div>
-            <div style="border: 1.5px solid #10303A; border-radius: 8px; padding: 10px; font-size: 13.5px; line-height: 1.4; grid-row: span 2; align-self: stretch; display: flex; flex-direction: column; justify-content: center; background: #FFFFFF"><b>"괜찮으세요?"</b>AI가 해녀에게 확인 신호를 보내고 응답을 기다림</div>
-            <div style="text-align: center; font-size: 16px" aria-hidden="true">▶</div>
-            <div style="border-radius: 8px; padding: 9px 12px; font-size: 13.5px; background: #DCEBDD; border: 1.5px solid #2E7A45"><b style="color: #1F5A31">응답 있음</b> <b style="font-family: Arial, sans-serif; font-weight: 700">→</b> 신고 취소</div>
-            <div style="text-align: center; font-size: 16px" aria-hidden="true">▶</div>
-            <div style="border-radius: 8px; padding: 9px 12px; font-size: 13.5px; background: #F8DCD0; border: 1.5px solid #B5441A"><b style="color: #8E3312">응답 없음</b> <b style="font-family: Arial, sans-serif; font-weight: 700">→</b> AI 에이전트가 122·119 신고</div>
-          </div>
-          <div style="display: flex; align-items: center; gap: 12px; background: #10303A; color: #F7F2E8; border-radius: 8px; padding: 10px 14px">
-            <span style="background: #FF5A5A; color: #0D1A1F; font-weight: 900; padding: 4px 12px; border-radius: 6px; font-size: 16px">SOS</span>
-            <span style="font-size: 14.5px">해녀가 SOS 신호를 보내면 확인 절차 없이 <b style="color: #F0C070">바로 신고</b></span>
+          <!-- SOS 알고리즘 순서도: 세 갈래(SOS 버튼 / 물 위 쓰러짐 / 물속 210초) → 모의 신고 -->
+          <div style="display: grid; grid-template-columns: 78px 15px 112px 15px 104px 15px minmax(0, 1fr) 44px 116px; grid-template-rows: repeat(3, auto); align-items: center; row-gap: 5px; font-size: 11px; line-height: 1.35">
+            <div style="grid-column: 1; grid-row: 1 / 4; align-self: stretch; background: #10303A; color: #F7F2E8; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; justify-content: center; gap: 3px"><b style="font-size: 13.5px; color: #F0C070">위급 단계 감지</b><span>세 갈래로 판단</span></div>
+
+            <div style="grid-column: 2; grid-row: 1; text-align: center; font-size: 12px" aria-hidden="true">▶</div>
+            <div style="grid-column: 3; grid-row: 1; background: #FFFFFF; border: 1.5px solid #10303A; border-radius: 7px; padding: 5px 8px"><b style="font-size: 12.5px">SOS 버튼 (A+B)</b><br><span style="color: #3A4C51">해녀가 직접 요청</span></div>
+            <div style="grid-column: 4 / 10; grid-row: 1; display: flex; align-items: center; gap: 6px; padding-right: 2px"><span style="flex: 1; border-top: 2px dashed #B5441A"></span><b style="color: #B5441A; font-size: 12px">확인 없이 바로</b><span style="flex: 1; border-top: 2px dashed #B5441A"></span><span style="color: #B5441A; font-size: 12px" aria-hidden="true">▶</span></div>
+
+            <div style="grid-column: 2; grid-row: 2; text-align: center; font-size: 12px" aria-hidden="true">▶</div>
+            <div style="grid-column: 3; grid-row: 2; background: #FFFFFF; border: 1.5px solid #10303A; border-radius: 7px; padding: 5px 8px"><b style="font-size: 12.5px">물 위에서 쓰러짐</b><br><span style="color: #3A4C51">충격 후 20초 무동작</span></div>
+            <div style="grid-column: 4; grid-row: 2; text-align: center; font-size: 12px" aria-hidden="true">▶</div>
+            <div style="grid-column: 5; grid-row: 2; background: #FFFFFF; border: 1.5px solid #10303A; border-radius: 7px; padding: 5px 8px"><b style="font-size: 12.5px">확인 신호 Q</b><br><span style="color: #3A4C51">소리 · 놀란 얼굴</span></div>
+            <div style="grid-column: 6; grid-row: 2; text-align: center; font-size: 12px" aria-hidden="true">▶</div>
+            <div style="grid-column: 7; grid-row: 2; background: #FFFFFF; border: 1.5px solid #FF7A3D; border-radius: 7px; padding: 5px 8px"><b style="font-size: 12.5px; color: #B5441A">30초 안에 버튼 응답?</b><br><span style="color: #1F5A31"><b>예</b> → 가짜 경보로 해제</span></div>
+            <div style="grid-column: 8; grid-row: 2; text-align: center; color: #B5441A; font-weight: 700; font-size: 11.5px">아니요 ▶</div>
+
+            <div style="grid-column: 2; grid-row: 3; text-align: center; font-size: 12px" aria-hidden="true">▶</div>
+            <div style="grid-column: 3; grid-row: 3; background: #FFFFFF; border: 1.5px solid #10303A; border-radius: 7px; padding: 5px 8px"><b style="font-size: 12.5px">물속 210초</b><br><span style="color: #3A4C51">끊긴 채 안 올라옴</span></div>
+            <div style="grid-column: 4; grid-row: 3; text-align: center; font-size: 12px" aria-hidden="true">▶</div>
+            <div style="grid-column: 5; grid-row: 3; background: #FFFFFF; border: 1.5px solid #10303A; border-radius: 7px; padding: 5px 8px"><b style="font-size: 12.5px">도움 신호 H</b><br><span style="color: #3A4C51">동료 해녀에게 경고</span></div>
+            <div style="grid-column: 6; grid-row: 3; text-align: center; font-size: 12px" aria-hidden="true">▶</div>
+            <div style="grid-column: 7; grid-row: 3; background: #FFFFFF; border: 1.5px solid #FF7A3D; border-radius: 7px; padding: 5px 8px"><b style="font-size: 12.5px; color: #B5441A">30초 안에 올라옴?</b><br><span style="color: #1F5A31"><b>예</b> → 자동 해제</span></div>
+            <div style="grid-column: 8; grid-row: 3; text-align: center; color: #B5441A; font-weight: 700; font-size: 11.5px">아니요 ▶</div>
+
+            <div style="grid-column: 9; grid-row: 1 / 4; align-self: stretch; background: #B5441A; color: #FFFFFF; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; justify-content: center; gap: 4px"><b style="font-size: 14px">모의 신고</b><b style="font-size: 12.5px">122 해양경찰<br>119 소방 구급</b><span>신고문 자동 작성 + AI가 지금 할 일 3가지 정리</span></div>
           </div>
           <div style="font-size: 12px; color: #5A666A">※ 신고 시간 판단은 규칙으로 처리해 AI가 느려도 신고가 늦어지지 않음 · 대회 시연에서는 모의 신고 화면으로 보여 줌</div>
         </div>
