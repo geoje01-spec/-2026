@@ -1,0 +1,1467 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>숨비 지킴이</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Cormorant+Garamond:ital,wght@1,500;1,600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+body{margin:0}
+[hidden]{display:none!important}
+
+/* 숨비 지킴이 · 제주 감성 매거진 (해녀바당과 같은 디자인)
+   모래빛 종이 위 깊은 바다색 잉크. 제목은 명조(나눔명조), 본문 Pretendard, 숫자 IBM Plex Mono.
+   강조색은 태왁 주황 하나, 경보 색(초록·노랑·빨강)은 상태에만 씀.
+   Layout: 상단 표지 머리 → 왼쪽 해녀 상태판(관제), 오른쪽 오늘 바다 + 에이전트 대화. 좁으면 한 줄로 쌓임 */
+:root{
+  --bg:#F3EDE2; --surface:#FBF8F2; --sunk:#ECE5D8; --ink:#10303A; --muted:#56696D; --line:#D8CDBB;
+  --sea:#10303A; --sea-ink:#F3EDE2; --sea-3:#1F6273;
+  --taewak:#E0531A;            /* 태왁(부표) 주황 = 강조색 */
+  --ok:#2C6E49; --warn:#8D5A00; --danger:#B3261E; --crit:#7E1010;
+  --ok-bg:#E2EDDD; --warn-bg:#F5E6C4; --danger-bg:#F6DCD6; --crit-bg:#F0C9C2;
+  --display:"Nanum Myeongjo","Noto Serif KR","AppleMyungjo","Batang",serif;
+  --latin:"Cormorant Garamond","Nanum Myeongjo",Georgia,serif;
+  --body:"Pretendard Variable",Pretendard,"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:6px;
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .28 0 0 0 0 .18 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1A1F; --surface:#13242A; --sunk:#0F1E23; --ink:#EFE7DA; --muted:#A7B4B2; --line:#2A3E45;
+  --sea:#EFE7DA; --sea-ink:#0D1A1F; --sea-3:#82C8D4; --taewak:#FF7A3D;
+  --ok:#8FD3A8; --warn:#F0C070; --danger:#FF7A6E; --crit:#FF5A5A;
+  --ok-bg:#18342A; --warn-bg:#3A2D14; --danger-bg:#3D1A18; --crit-bg:#541414; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1A1F; --surface:#13242A; --sunk:#0F1E23; --ink:#EFE7DA; --muted:#A7B4B2; --line:#2A3E45;
+  --sea:#EFE7DA; --sea-ink:#0D1A1F; --sea-3:#82C8D4; --taewak:#FF7A3D;
+  --ok:#8FD3A8; --warn:#F0C070; --danger:#FF7A6E; --crit:#FF5A5A;
+  --ok-bg:#18342A; --warn-bg:#3A2D14; --danger-bg:#3D1A18; --crit-bg:#541414; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;
+  background-color:var(--bg);background-image:var(--grain);min-height:100vh}
+/* 바닥에 선으로 그린 물결 세 줄 */
+body::after{content:"";position:fixed;left:0;right:0;bottom:0;height:80px;pointer-events:none;z-index:0;background:var(--sea-3);opacity:.16;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 70'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.4'%3E%3Cpath d='M0 18q30-14 60 0t60 0 60 0 60 0'/%3E%3Cpath d='M0 38q30-14 60 0t60 0 60 0 60 0'/%3E%3Cpath d='M0 58q30-14 60 0t60 0 60 0 60 0'/%3E%3C/g%3E%3C/svg%3E") repeat-x 0 0/240px 70px;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 70'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.4'%3E%3Cpath d='M0 18q30-14 60 0t60 0 60 0 60 0'/%3E%3Cpath d='M0 38q30-14 60 0t60 0 60 0 60 0'/%3E%3Cpath d='M0 58q30-14 60 0t60 0 60 0 60 0'/%3E%3C/g%3E%3C/svg%3E") repeat-x 0 0/240px 70px;
+  animation:drift 30s linear infinite}
+@keyframes drift{to{-webkit-mask-position:240px 0;mask-position:240px 0}}
+@media (prefers-reduced-motion:reduce){body::after{animation:none}}
+
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--taewak);outline-offset:3px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* 상단: 잡지 표지 머리 (제호 + 영문 부제 + 겹줄) */
+header.top{position:relative;z-index:2;background:transparent;color:var(--ink);padding-block:16px 12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top-in{max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;
+  padding-bottom:12px;border-bottom:1px solid var(--ink);box-shadow:0 3px 0 -2px var(--ink)}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .logo{width:40px;height:40px;flex:none;color:var(--ink)}
+.brand h1{font-family:var(--display);font-weight:800;font-size:32px;margin:0;letter-spacing:-.03em;line-height:1}
+.brand h1 b{color:var(--taewak);font-weight:800}
+.brand span{display:block;font-size:12.5px;color:var(--muted);margin-top:6px}
+.brand span i{font-family:var(--latin);font-weight:600;font-size:15px;color:var(--sea-3);margin-right:6px}
+.top-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.conn{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.dot.on{background:var(--ok)}.dot.sim{background:#D9A21E}
+
+/* 버튼: 각진 잉크 테두리, 주요 버튼은 테왁 주황 */
+.btn{border:1.5px solid var(--ink);background:transparent;color:var(--ink);padding:8px 16px;border-radius:var(--r);cursor:pointer;font-weight:700;transition:background .15s,color .15s}
+.btn:hover{background:var(--ink);color:var(--bg)}
+.btn.primary{background:var(--taewak);border-color:var(--taewak);color:#fff}
+.btn.primary:hover{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.btn.ghost-on-sea{background:var(--surface);color:var(--ink);border-color:var(--ink)}
+.btn.ghost-on-sea:hover{background:var(--ink);color:var(--bg)}
+.btn.small{padding:4px 11px;font-size:13px}
+.btn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+
+main{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding-block:20px 120px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:920px){main{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:22px;min-width:0}
+/* 칸: 종이 한 장, 위에 굵은 잉크 줄 */
+section.panel{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--ink);border-radius:0 0 var(--r) var(--r);padding:20px;min-width:0}
+.panel-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.panel-h h2{margin:4px 0 0;font-family:var(--display);font-size:26px;font-weight:800;line-height:1.15;letter-spacing:-.03em}
+.eyebrow{font-size:11.5px;letter-spacing:.16em;color:var(--sea-3);text-transform:uppercase;font-weight:700}
+.note{font-size:12.5px;color:var(--muted)}
+
+/* 해녀 카드 */
+.divers{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.diver{border:1px solid var(--line);border-radius:var(--r);overflow:hidden;background:var(--bg);display:flex;flex-direction:column}
+.diver .stripe{height:5px;background:var(--ok)}
+.diver[data-lv="1"] .stripe{background:var(--warn)}
+.diver[data-lv="2"] .stripe{background:var(--danger)}
+.diver[data-lv="3"] .stripe{background:var(--crit);animation:blink 1s steps(2) infinite}
+.diver[data-lv="3"]{border-color:var(--crit)}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.diver[data-lv="3"] .stripe{animation:none}}
+.diver-in{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.diver-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.diver-name{font-family:var(--display);font-weight:800;font-size:19px;letter-spacing:-.02em}
+.diver-name small{font-family:var(--latin);font-style:italic;color:var(--sea-3);font-weight:600;font-size:15px;margin-left:4px;letter-spacing:0}
+.pill{font-size:12px;font-weight:700;padding:2px 9px;border-radius:3px;white-space:nowrap}
+.lv0{background:var(--ok-bg);color:var(--ok)} .lv1{background:var(--warn-bg);color:var(--warn)}
+.lv2{background:var(--danger-bg);color:var(--danger)} .lv3{background:var(--crit-bg);color:var(--crit)}
+.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;border-top:1px solid var(--line);padding-top:10px}
+.metric .k{font-size:11.5px;color:var(--muted);font-weight:600}
+.metric .v{font-family:var(--mono);font-size:17px;font-variant-numeric:tabular-nums}
+.metric .v small{font-size:12px;color:var(--muted);margin-left:2px}
+.reasons{margin:0;padding-left:18px;font-size:13px;min-height:20px}
+.reasons li{margin:1px 0}
+.spark{width:100%;height:34px;display:block}
+.diver-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+
+/* 시뮬레이터 */
+.sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 14px}
+.sim-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+select,input[type=text],input[type=number],input[type=password],textarea{background:var(--bg);border:1px solid var(--line);border-bottom:2px solid var(--ink);border-radius:var(--r) var(--r) 0 0;padding:8px 12px;width:100%;min-width:0;color:var(--ink)}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--taewak)}
+.switch{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;cursor:pointer}
+.switch input{accent-color:var(--taewak);width:16px;height:16px}
+
+/* 기록 */
+.log{max-height:220px;overflow:auto;font-size:13px;display:flex;flex-direction:column;gap:2px}
+.log div{display:grid;grid-template-columns:62px 1fr;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.log time{font-family:var(--mono);color:var(--muted);font-size:12px}
+
+/* 바다 */
+.sea-form{display:flex;gap:8px;flex-wrap:wrap}
+.sea-form input{flex:1 1 160px}
+.sea-result{margin-top:16px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.temp-big{font-family:var(--display);font-weight:800;font-size:58px;line-height:1;color:var(--ink);letter-spacing:-.04em}
+.temp-big small{font-size:22px;color:var(--muted);letter-spacing:0}
+.verdict{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.03em}
+.v-ok{color:var(--ok)}.v-warn{color:var(--warn)}.v-bad{color:var(--danger)}
+.sea-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-top:4px}
+.sea-meta b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.scale{margin-top:14px}
+.scale-bar{position:relative;height:8px;overflow:hidden;display:flex}
+.scale-bar i{display:block;height:100%}
+.scale-marker{position:relative;height:14px}
+.scale-marker span{position:absolute;top:0;width:2px;height:14px;background:var(--ink);transform:translateX(-1px)}
+.scale-ticks{position:relative;height:16px;font-family:var(--mono);font-size:11px;color:var(--muted)}
+.scale-ticks span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
+.scale-ticks span:first-child{transform:none}
+.scale-ticks span:last-child{transform:translateX(-100%)}
+
+/* 에이전트 */
+.chat{display:flex;flex-direction:column;gap:10px;max-height:440px;min-height:240px;overflow:auto;padding:4px 2px 8px}
+.msg{max-width:92%;padding:10px 14px;border-radius:14px;white-space:pre-wrap;word-break:break-word;font-size:14px}
+.msg.user{align-self:flex-end;background:var(--sea);color:var(--sea-ink);border-bottom-right-radius:3px}
+.msg.bot{align-self:flex-start;background:var(--sunk);border-bottom-left-radius:3px;font-family:var(--display);font-size:14.5px;line-height:1.8}
+.msg.tool{align-self:flex-start;background:transparent;border:1px dashed var(--line);color:var(--muted);font-size:12.5px;padding:4px 10px}
+.state{display:flex;justify-content:space-between;align-items:center;gap:8px;border-radius:var(--r);padding:7px 11px;font-size:13.5px}
+.state.under{background:var(--sea);color:var(--sea-ink)}
+.state.surface{background:var(--ok-bg);color:var(--ok)}
+.state b{font-size:15px}
+.tl{width:100%;height:14px;display:block}
+.msg.trace{padding:8px 12px;max-width:92%;font-family:var(--body);font-size:13.5px;line-height:1.6}
+.msg.trace b{font-size:12px;color:var(--ink);font-weight:700}
+.msg.trace ol{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:2px}
+.msg.trace:not(.done) b::after{content:" …"}
+.msg.proactive{align-self:stretch;max-width:100%;background:var(--surface);border:1.5px solid var(--taewak);border-radius:var(--r);display:flex;flex-direction:column;gap:6px;white-space:normal}
+.pro-h{font-size:12px;font-weight:700;color:var(--taewak);letter-spacing:.04em}
+.pro-t{white-space:pre-wrap;font-family:var(--display);line-height:1.8}
+.pro-a{display:flex;gap:6px;flex-wrap:wrap}
+.steps{display:flex;gap:4px;flex-wrap:wrap}
+.steps span{font-size:11.5px;background:var(--sunk);color:var(--muted);border-radius:3px;padding:1px 8px}
+.agent-ctl{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.chat-form{display:flex;gap:8px;margin-top:10px}
+.chat-form input{flex:1}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.quick button{font-size:12.5px;font-weight:600;padding:5px 12px;border-radius:99px;border:1px solid var(--muted);background:transparent;cursor:pointer;transition:background .15s,color .15s}
+.quick button:hover{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.agent-mode{font-size:12px;color:var(--muted)}
+
+/* 대화상자 */
+dialog{border:none;border-top:3px solid var(--ink);border-radius:0 0 var(--r) var(--r);padding:0;background:var(--surface);color:var(--ink);width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 32px);box-shadow:0 30px 80px rgba(0,0,0,.35)}
+dialog::backdrop{background:#10303Acc}
+.dlg-h{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.dlg-h h3{margin:0;font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:-.02em}
+.dlg-b{padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.dlg-f{padding:12px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+fieldset{border:1px solid var(--line);border-radius:var(--r);padding:14px;margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+legend{font-family:var(--display);font-weight:800;font-size:15px;padding:0 6px}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600}
+.row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+pre.raw{background:var(--sunk);border-radius:var(--r);padding:10px;font-family:var(--mono);font-size:12px;max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+
+/* 응급 */
+#emg .dlg-h{background:var(--crit);color:#fff;border:none}
+.count{font-family:var(--display);font-weight:800;font-size:72px;line-height:1;color:var(--crit);text-align:center;letter-spacing:-.04em}
+.mock-badge{display:inline-block;background:var(--warn-bg);color:var(--warn);font-weight:700;font-size:12.5px;padding:3px 10px;border-radius:3px}
+.call-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.call{border:1px solid var(--line);border-top:3px solid var(--ink);border-radius:0 0 var(--r) var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.call .num{font-family:var(--display);font-weight:800;font-size:38px;line-height:1;letter-spacing:-.03em}
+.call a{color:var(--taewak);font-weight:700;font-size:13px}
+.fcst{margin-top:18px;border-top:1px solid var(--ink);padding-top:14px}
+.fcst h3{margin:0 0 8px;font-family:var(--display);font-weight:800;font-size:17px;letter-spacing:-.02em}
+.fcst-wrap{overflow-x:auto}
+.fcst table{border-collapse:collapse;width:100%;font-size:13px;min-width:320px}
+.fcst th,.fcst td{padding:6px 6px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.fcst th{font-weight:700;color:var(--muted);font-size:11.5px;letter-spacing:.06em;border-bottom-color:var(--ink)}
+.fcst td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.check-box{display:flex;gap:12px;align-items:flex-start;background:var(--sunk);border-radius:var(--r);padding:12px;font-size:14px}
+.ping{flex:none;width:12px;height:12px;margin-top:5px;border-radius:50%;background:var(--taewak);animation:ping 1.2s ease-out infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 var(--taewak)}100%{box-shadow:0 0 0 10px transparent}}
+@media (prefers-reduced-motion:reduce){.ping{animation:none}}
+#emg[data-step="0"] .dlg-h{background:var(--ok)}
+.msg.alert{border-left:3px solid var(--crit)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:var(--r);font-size:14px;font-weight:600;z-index:50;max-width:calc(100vw - 32px)}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand"><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="15" r="9" fill="#e0531a"/><path d="M11.3 13.3c5.7 2 11.7 2 17.4 0" stroke="#fbf8f2" stroke-width="1.8" fill="none" stroke-linecap="round"/><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 28c2.8-2.1 5.7-2.1 8.5 0s5.7 2.1 8.5 0 5.7-2.1 8.5 0 5.7 2.1 8.5 0"/><path d="M7 34.5c2.2-1.6 4.3-1.6 6.5 0s4.3 1.6 6.5 0 4.3-1.6 6.5 0 4.3 1.6 6.5 0" opacity=".45"/></g></svg><div><h1>숨비 <b>지킴이</b></h1><span><i>Sumbi Guardian</i>해녀 건강 관제 · 물질 판단 에이전트</span></div></div>
+    <div class="top-actions">
+      <span class="conn" id="connState"><i class="dot sim" id="connDot"></i><span id="connText">시뮬레이션 중</span></span>
+      <button class="btn ghost-on-sea" id="btnSerial">마이크로비트 연결</button>
+      <button class="btn ghost-on-sea" id="btnSettings">설정</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="col">
+    <section class="panel">
+      <div class="panel-h">
+        <div><div class="eyebrow">실시간 관제</div><h2>해녀 상태</h2><div class="note" id="stateSum"></div></div>
+        <span class="note" id="clock"></span>
+      </div>
+      <div class="divers" id="divers"></div>
+      <p class="note" style="margin:12px 0 0">라디오 신호가 <b>끊기면 물질 중(물속)</b>, <b>다시 잡히면 휴식 중(물 위)</b>으로 봅니다. 물속 시간이 기준(설정)을 넘거나 충분히 쉬지 않고 다시 들어가면 단계적으로 경고하고, 위급하면 주변 해녀에게 도움 신호를 보낸 뒤 올라오지 않을 때만 해양경찰(122)·119 <b>모의</b> 신고로 넘어갑니다.</p>
+    </section>
+
+    <section class="panel" id="simPanel">
+      <div class="panel-h">
+        <div><div class="eyebrow">시연용</div><h2>상황 시뮬레이터</h2></div>
+        <label class="switch"><input type="checkbox" id="simOn" checked> 시뮬레이션 켜기</label>
+      </div>
+      <div class="sim-grid" id="simGrid"></div>
+      <p class="note" style="margin:10px 0 0">마이크로비트를 연결하면 시뮬레이션은 자동으로 꺼집니다. 예시 해녀 이름은 설정에서 바꿀 수 있어요.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-h"><div><div class="eyebrow">기록</div><h2>경보·신고 기록</h2></div>
+        <button class="btn small" id="btnClearLog">지우기</button></div>
+      <div class="log" id="log"></div>
+    </section>
+  </div>
+
+  <div class="col">
+    <section class="panel">
+      <div class="panel-h"><div><div class="eyebrow">오늘의 물질</div><h2>바다 상태 확인</h2></div>
+        <span class="note" id="seaSource"></span></div>
+      <form class="sea-form" id="seaForm">
+        <label for="seaSite" class="note" style="flex-basis:100%">오늘 가는 바다 (가까운 조위관측소)</label>
+        <select id="seaSite" style="flex:1 1 180px"></select>
+        <button class="btn primary" type="submit">수온 확인</button>
+      </form>
+      <div id="seaOut"></div>
+      <div class="fcst" id="fcstOut"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-h"><div><div class="eyebrow">AI 에이전트</div><h2>물질 도우미</h2></div>
+        <div class="agent-ctl"><label class="switch" title="켜면 위험하거나 물질 시간이 넘을 때 에이전트가 직접 쉬라는 신호를 보내요"><input type="checkbox" id="autoOn" checked> 자율 모드</label><span class="agent-mode" id="agentMode"></span></div></div>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="quick" id="quick">
+        <button type="button">오늘 물질해도 돼?</button>
+        <button type="button">해녀들 상태 어때?</button>
+        <button type="button">어느 바다가 제일 좋아?</button>
+        <button type="button">다음 주 파도 어때?</button>
+        <button type="button">30분 뒤에 쉬라고 알려줘</button>
+      </div>
+      <form class="chat-form" id="chatForm">
+        <input type="text" id="chatIn" placeholder="예: 양춘자 삼촌 쉬라고 해줘 / 고옥자 삼촌 무릎 안 좋은 거 기억해" autocomplete="off">
+        <button class="btn primary" type="submit">보내기</button>
+      </form>
+    </section>
+  </div>
+</main>
+
+<!-- 설정 -->
+<dialog id="settings">
+  <div class="dlg-h"><h3>설정</h3><button class="btn small" id="setClose" type="button">닫기</button></div>
+  <div class="dlg-b">
+    <fieldset>
+      <legend>AI 에이전트 (Google Gemini 무료 키)</legend>
+      <p class="note" style="margin:0">aistudio.google.com 에서 Google 계정으로 무료 API 키를 받을 수 있어요. 키가 없으면 규칙 기반 도우미로 동작합니다. 키는 이 브라우저에만 저장됩니다.</p>
+      <div class="row2">
+        <label class="field">API 키<input type="password" id="aiKey" autocomplete="off"></label>
+        <label class="field">모델 이름<input type="text" id="aiModel"></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>공공데이터 API (수온 · 기상청 해상예보)</legend>
+      <p class="note" style="margin:0" id="apiModeNote"></p>
+      <div class="row2">
+        <label class="field">공공데이터포털 인증키 (Encoding 키)<input type="password" id="wKey" autocomplete="off"></label>
+        <label class="field">수온 항목 이름 (자동 인식이 안 될 때만)<input type="text" id="wTempPath" placeholder="예: wtem"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" id="wTest">수온 응답 보기</button><button class="btn small" type="button" id="fTest">해상예보 응답 보기</button></div>
+      <pre class="raw" id="wRaw" hidden></pre>
+    </fieldset>
+    <fieldset>
+      <legend>경보 기준</legend>
+      <div class="row2">
+        <label class="field">물속(신호 끊김) 주의(초)<input type="number" id="tLostWarn"></label>
+        <label class="field">물속 위험(초)<input type="number" id="tLostDanger"></label>
+        <label class="field">물속 위급(초)<input type="number" id="tLostCrit"></label>
+        <label class="field">최소 물 위 휴식(초)<input type="number" id="tMinRest"></label>
+        <label class="field">충격 후 무움직임 위급(초)<input type="number" id="tFallStill"></label>
+        <label class="field">무움직임 주의(초)<input type="number" id="tStillWarn"></label>
+        <label class="field">해녀 응답 기다리는 시간(초)<input type="number" id="tCountdown"></label>
+        <label class="field">맥박 하한·상한<input type="text" id="tBpm" placeholder="50,150"></label>
+        <label class="field">물질 최저 수온(℃)<input type="number" id="tSeaMin" step="0.5"></label>
+        <label class="field">물질 주의 수온(℃)<input type="number" id="tSeaWarn" step="0.5"></label>
+        <label class="field">최대 파고(m)<input type="number" id="tWaveMax" step="0.1"></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>신고에 들어갈 정보</legend>
+      <div class="row2">
+        <label class="field">작업 장소 이름<input type="text" id="rPlace" placeholder="○○리 앞바다"></label>
+        <label class="field">관리자 연락처<input type="text" id="rPhone"></label>
+        <label class="field">위도<input type="text" id="rLat"></label>
+        <label class="field">경도<input type="text" id="rLon"></label>
+      </div>
+      <div><button class="btn small" type="button" id="rGeo">현재 위치 가져오기</button> <span class="note" id="rGeoMsg"></span></div>
+      <label class="field">해녀 이름 (번호=이름, 줄마다 한 명)<textarea id="rNames" rows="3"></textarea></label>
+    </fieldset>
+  </div>
+  <div class="dlg-f"><button class="btn primary" type="button" id="setSave">저장</button></div>
+</dialog>
+
+<!-- 응급 -->
+<dialog id="emg">
+  <div class="dlg-h"><h3 id="emgTitle">위급 상황 감지</h3><span class="mock-badge" style="background:#fff;color:var(--crit)">모의 신고</span></div>
+  <div class="dlg-b" id="emgStep0" hidden>
+    <p style="margin:0" id="emgOk"></p>
+  </div>
+  <div class="dlg-b" id="emgStep1">
+    <p style="margin:0" id="emgWhy"></p>
+    <div class="check-box"><span class="ping" aria-hidden="true"></span><span id="emgMsg"></span></div>
+    <div class="count mono" id="emgCount">30</div>
+    <p class="note" style="margin:0;text-align:center" id="emgNote">초 안에 해녀가 응답하지 않으면 비상 상황으로 판단해 해양경찰·119 신고 화면으로 넘어갑니다.</p>
+  </div>
+  <div class="dlg-b" id="emgStep2" hidden>
+    <span class="mock-badge">시연용 모의 신고입니다. 실제로 전송되지 않았습니다.</span>
+    <div class="call-row">
+      <div class="call"><span class="note">해양경찰 (해상 사고)</span><span class="num">122</span><a href="tel:122">전화 걸기</a></div>
+      <div class="call"><span class="note">소방 구급</span><span class="num">119</span><a href="tel:119">전화 걸기</a></div>
+    </div>
+    <label class="field">신고 내용 (전화로 불러주거나 119 문자신고에 붙여넣기)<textarea id="emgText" rows="7" readonly></textarea></label>
+  </div>
+  <div class="dlg-f" id="emgF0" hidden>
+    <button class="btn primary" type="button" id="emgOkClose">닫기</button>
+  </div>
+  <div class="dlg-f" id="emgF1">
+    <button class="btn" type="button" id="emgCancel">관리자가 직접 확인함 (이상 없음)</button>
+    <button class="btn danger" type="button" id="emgNow">지금 신고</button>
+  </div>
+  <div class="dlg-f" id="emgF2" hidden>
+    <button class="btn" type="button" id="emgCopy">신고 내용 복사</button>
+    <button class="btn primary" type="button" id="emgClose">닫기</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+/* ================= 설정 ================= */
+const DEFAULTS = {
+  ai:{key:"", model:"gemini-flash-lite-latest"},
+  water:{key:"", tempPath:""},
+  t:{lostWarn:90, lostDanger:150, lostCrit:210, minRest:30, fallStill:20, stillWarn:45, countdown:30,
+     bpmLo:50, bpmHi:150, tempWarn:15, tempDanger:12, seaMin:12, seaWarn:15, seaHigh:28,
+     waveWarn:2.5, waveMax:3.0, windWarn:7, windMax:10},
+  report:{place:"", phone:"", lat:"", lon:""},
+  names:{1:"김순덕(예시)",2:"고옥자(예시)",3:"양춘자(예시)"},
+  site:"DT_0022"
+};
+let S = load();
+// 예전 저장값(파고 1.5m 기준) 갱신: 풍랑주의보 기준 3m에 맞춤
+if(!(S.v>=2)){ S.t.waveMax=3.0; S.t.waveWarn=2.0; }
+// 더 빠른 모델로 교체 (예전 기본값만 바꿈)
+if(!(S.v>=3)){ if(S.ai.model==="gemini-flash-latest") S.ai.model="gemini-flash-lite-latest"; }
+// 파고 기준 완화: 2.5m 이상 주의, 3m 이상 부적합
+if(!(S.v>=4)){ S.t.waveWarn=2.5; S.t.waveMax=3.0; }
+if(!(S.v>=5)){ if(S.t.countdown===20) S.t.countdown=30; }
+// 라디오 신호로 물속/물 위를 판단하는 방식에 맞춘 기준 (물속 90초 주의, 150초 위험, 210초 위급)
+if(!(S.v>=6)){ S.t.lostWarn=90; S.t.lostDanger=150; S.t.lostCrit=210; S.t.minRest=S.t.minRest||30; S.v=6; save(); }
+function load(){
+  let s = null;
+  try{ s = JSON.parse(localStorage.getItem("sumbi-settings")||"null"); }catch(e){}
+  const d = JSON.parse(JSON.stringify(DEFAULTS));
+  if(s){ for(const k of Object.keys(d)){ if(typeof d[k]==="object" && s[k]) Object.assign(d[k], s[k]); else if(s[k]!==undefined) d[k]=s[k]; } }
+  return d;
+}
+function save(){ try{ localStorage.setItem("sumbi-settings", JSON.stringify(S)); }catch(e){} }
+
+/* ================= 공통 ================= */
+const $ = id => document.getElementById(id);
+const LV = ["정상","주의","위험","위급"];
+const now = () => Date.now();
+const hhmm = (t=new Date()) => t.toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,3500); }
+function log(msg){ const el=$("log"); const row=document.createElement("div"); const tm=document.createElement("time"); tm.textContent=hhmm(); const p=document.createElement("span"); p.textContent=msg; row.append(tm,p); el.prepend(row); }
+let audio=null;
+function beep(freq=880, ms=300, times=2){
+  try{ audio = audio || new (window.AudioContext||window.webkitAudioContext)();
+    for(let i=0;i<times;i++){ const o=audio.createOscillator(), g=audio.createGain(); o.frequency.value=freq; o.connect(g); g.connect(audio.destination);
+      const st=audio.currentTime+i*(ms/1000+0.12); g.gain.setValueAtTime(0.15,st); g.gain.setValueAtTime(0,st+ms/1000); o.start(st); o.stop(st+ms/1000+0.02); }
+  }catch(e){}
+}
+document.addEventListener("pointerdown",()=>{ try{ audio = audio || new (window.AudioContext||window.webkitAudioContext)(); audio.resume(); }catch(e){} },{once:true});
+
+/* ================= 해녀 데이터 ================= */
+const divers = new Map();
+function diver(id){
+  if(!divers.has(id)) divers.set(id,{id, last:null, lastAt:0, hist:[], level:0, reasons:[], ackUntil:0, reported:false, prevLevel:0,
+    under:false, diveStart:0, surfacedAt:0, dives:[], restBefore:null, shortRest:false, tl:[]});
+  return divers.get(id);
+}
+const nameOf = id => S.names[id] || `해녀 ${id}`;
+
+// 수신 형식: D,번호,온도,맥박,쓰러짐,무움직임초,SOS,신호세기
+// 응답 형식: A,번호  (해녀가 확인 신호에 버튼으로 답함)
+// 부표 마이크로비트(buoy_receiver_python.py)는 위 형식 대신 사건만 알림: "EVENT: DIVER SUBMERGED" 등 → buoyEvent
+function ingest(line){
+  line=line.trim();
+  if(/^(EVENT|ALERT|INFO):/i.test(line)){ buoyEvent(line); return; }
+  if(line.startsWith("A,")){ const id=parseInt(line.split(",")[1]); if(id>0) onAck(id); return; }
+  // "D," 없이 해녀용 형식(번호,온도,맥박,쓰러짐,무움직임초,SOS)만 온 줄도 받아 줌
+  if(/^\d+(,-?[\d.]+){5,6}$/.test(line)) line="D,"+line;
+  const p=line.split(",");
+  if(!line.startsWith("D,") || p.length<7){ serialOdd(line); return; }
+  const id=parseInt(p[1]); if(!(id>0)) return;
+  const pk={temp:+p[2], bpm:+p[3], fall:+p[4], still:+p[5], sos:+p[6], rssi:p[7]!==undefined?+p[7]:null};
+  const d=diver(id);
+  // 라디오가 다시 잡힘 = 물 위로 올라옴. 끊겨 있던 시간이 한 번의 잠수 시간
+  const gap=d.lastAt?(now()-d.lastAt)/1000:0;
+  if(d.lastAt && gap>gapOf(d) && isBuoy(d) && gap<BUOY_BLIP){ d.under=false; d.shortRest=false; }   // 부표: 잠깐 끊긴 건 잠수로 치지 않음
+  else if(d.lastAt && gap>gapOf(d)){
+    const len=Math.round(gap); d.dives.push({len,end:now()}); if(d.dives.length>200) d.dives.shift();
+    if(isBuoy(d)) log(`${nameOf(id)}: ${fmtSec(len)} 잠수 후 물 위로 올라옴 (부표 알림)`);
+    d.under=false; d.surfacedAt=now(); d.shortRest=false;
+    if(!isBuoy(d) && len>=S.t.lostWarn) log(`${nameOf(id)}: ${len}초 잠수 후 물 위로 올라옴`);
+    if(d.pendingRecall){ d.pendingRecall=false; sendLine(`R,${id}`); log(`${nameOf(id)}: 올라와서 미뤄둔 휴식 신호 전달`); }
+    if(emg.active && emg.diver===d && emg.stage===1 && emg.under) setTimeout(()=>onSurface(id,len),0);
+  }
+  if(!d.surfacedAt) d.surfacedAt=now();
+  // 물질 시작 시각: 처음 신호를 받았거나 15분 넘게 끊겼다가 다시 들어오면 새로 셈
+  if(!d.sessionStart || now()-d.lastAt>15*60000) d.sessionStart=now()-(sim.on&&!d.lastAt?Math.round(rnd(5,25))*60000:0);
+  d.last=pk; d.lastAt=now();
+  d.hist.push(pk.bpm>0?pk.bpm:null); if(d.hist.length>60) d.hist.shift();
+}
+
+/* 부표 마이크로비트: 해녀 한 명(1번)의 입수·복귀·SOS만 알려 주고, 물 위에 있는 동안은 조용함.
+   그래서 물 위에 있는 동안은 앱이 1초마다 "물 위" 신호를 대신 넣어 기존 규칙(물속 시간·쉬는 시간·SOS)을 그대로 씀.
+   맥박·온도는 없으므로 비워 둠(NaN). 부표 자체의 잠수 시간 경보는 기록·알림만 하고, 단계 판단은 앱 설정 기준으로 함 */
+const BUOY_ID=1, BUOY_GAP=3000;   // 부표는 신호가 3초 끊기면 입수로 알려 줌
+const BUOY_BLIP=5;                 // 5초 안에 다시 잡히면 전파가 잠깐 튄 것 → 잠수 기록 안 함
+const buoy={on:false, up:false, sosUntil:0, alerted:false, last:null, info:null};
+const isBuoy=d=>buoy.on && d.id===BUOY_ID;
+// 물속으로 보는 기준: 부표는 이미 2초를 기다렸다 알려 주므로 알림 즉시, 보통 마이크로비트는 4초
+const gapOf=d=>isBuoy(d)?BUOY_GAP/1000-0.1:SURF_GAP;
+function buoyFeed(){ ingest(`D,${BUOY_ID},nan,nan,0,0,${now()<buoy.sosUntil?1:0}`); }
+function buoyEvent(line){
+  const t=line.toUpperCase();
+  if(!buoy.on){ buoy.on=true; log("부표 마이크로비트 신호를 받고 있어요 (입수·복귀를 알려 주는 방식, 해녀 1명)"); }
+  // 진단 줄 "INFO: RX 받은수 RSSI 세기 GAP 가장긴끊김ms" (5초마다)
+  const m=t.match(/^INFO:\s*RX\s+(-?\d+)\s+RSSI\s+(-?\d+)\s+GAP\s+(-?\d+)/);
+  if(t.startsWith("INFO:")){
+    if(!m) return;
+    buoy.info={rx:+m[1], rssi:+m[2], gap:+m[3], at:now()};
+    // 처음 연결했을 때 해녀가 물 위에 있으면(신호가 옴) 입수를 기다리지 않고 바로 카드를 만듦
+    if(buoy.info.rx>0 && !buoy.last && !diver(BUOY_ID).lastAt){ buoy.up=true; buoyFeed(); }
+    if(buoy.info.rx>0 && buoy.info.gap>=1500 && buoy.info.gap<=BUOY_GAP)
+      log(`부표 진단: 신호가 ${(buoy.info.gap/1000).toFixed(1)}초 끊겼다 다시 잡힘 (세기 ${buoy.info.rssi}, 5초에 ${buoy.info.rx}번 받음)`);
+    return;
+  }
+  buoy.last={at:now(), what:t.includes("SUBMERGED")?"물에 들어감":t.includes("RETURNED")?"물 위로 올라옴":t.includes("SOS")?"SOS":t.includes("CRITICAL")?"물속 위급":t.includes("DANGER")?"물속 위험":t.includes("WARN")?"물속 주의":t.includes("EXCEEDED")?"잠수 시간 초과":line.slice(0,30)};
+  if(t.includes("SUBMERGED")){
+    const d=diver(BUOY_ID);
+    if(!d.lastAt) buoyFeed();                 // 처음 받은 신호면 카드부터 만들기
+    buoy.up=false; buoy.alerted=false;
+    d.lastAt=now()-BUOY_GAP;                  // 마지막 신호는 2초 전 → 물속 시간이 그때부터
+    log(`${nameOf(BUOY_ID)}: 물에 들어감 (부표 알림)`);
+  }else if(t.includes("RETURNED")){
+    buoy.up=true; buoyFeed();                 // 물 위 신호 → 잠수 시간 기록, 휴식 시작
+  }else if(t.includes("SOS")){
+    buoy.up=true; buoy.sosUntil=now()+15000; buoyFeed();   // SOS는 물 위에서 눌린 것 → 바로 신고 절차
+  }else if(/CRITICAL|DANGER|WARN/.test(t)){
+    // 부표의 물속 시간 3단계 (주의 90초 · 위험 150초 · 위급 210초). 단계 판단·신고 절차는 앱 설정 기준으로 따로 돌아감
+    const k=t.includes("CRITICAL")?"위급":t.includes("DANGER")?"위험":"주의", sec=(t.match(/(\d+)S/)||[])[1];
+    log(`${nameOf(BUOY_ID)}: 부표 경보 - 물속 ${sec?sec+"초":"시간"} ${k}`);
+    if(k!=="위급") toast(`⚠ 부표 경보: ${nameOf(BUOY_ID)} 물속 ${sec?sec+"초 ":""}${k}`);
+  }else if(t.includes("EXCEEDED")){
+    if(!buoy.alerted){ buoy.alerted=true; log(`${nameOf(BUOY_ID)}: 부표 경보 - 부표에 정한 잠수 시간을 넘음`); toast(`⚠ 부표 경보: ${nameOf(BUOY_ID)} 잠수 시간 초과`); beep(660,250,2); }
+  }
+}
+
+function evaluate(d){
+  const T=S.t, r=[]; let lv=0; const up=(l,msg)=>{ lv=Math.max(lv,l); r.push(msg); };
+  if(!d.last){ return {level:0,reasons:["신호 대기 중"]}; }
+  const lost=(now()-d.lastAt)/1000, under=lost>gapOf(d), sec=Math.round(lost);
+  if(under){
+    if(lost>=T.lostCrit) up(3,`물속 ${sec}초째 안 올라옴`);
+    else if(lost>=T.lostDanger) up(2,`물속 ${sec}초째, 너무 길어요`);
+    else if(lost>=T.lostWarn) up(1,`물속 ${sec}초째, 평소보다 길어요`);
+    if(d.shortRest) up(1,`물 위에서 ${d.restBefore}초만 쉬고 다시 들어감`);
+    if(lost>=T.lostWarn && d.last && d.last.rssi!=null && d.last.rssi<-85) r.push("들어가기 전 신호가 약했어요 (멀어져서 끊겼을 수도 있음)");
+    if(!r.length) r.push(`물질 중 · 물속 ${sec}초`);
+    return {level:lv,reasons:r};   // 물속에서는 마지막 측정값이 낡았으므로 아래 검사는 하지 않음
+  }
+  const k=d.last;
+  if(k.sos) up(3,"SOS 버튼을 눌렀음");
+  if(k.fall && k.still>=T.fallStill) up(3,`충격 후 ${k.still}초 동안 움직임 없음`);
+  else if(k.fall) up(2,"충격·추락 감지, 확인 필요");
+  else if(k.still>=T.stillWarn) up(1,`${k.still}초 동안 움직임 없음`);
+  if(k.bpm>0){
+    if(k.bpm>T.bpmHi+15||k.bpm<T.bpmLo-10) up(2,`맥박 ${k.bpm}회/분 (매우 비정상)`);
+    else if(k.bpm>T.bpmHi||k.bpm<T.bpmLo) up(1,`맥박 ${k.bpm}회/분`);
+  } else if(k.bpm===0) up(1,"맥박이 잡히지 않음 (센서 위치 확인)");
+  if(k.temp<=T.tempDanger) up(2,`착용부 온도 ${k.temp}℃, 저체온 위험`);
+  else if(k.temp<T.tempWarn) up(1,`착용부 온도 ${k.temp}℃, 추위 주의`);
+  if(!r.length) r.push(`휴식 중 · 물 위 ${Math.round((now()-d.surfacedAt)/1000)}초`);
+  return {level:lv,reasons:r};
+}
+const SURF_GAP=4;   // 4초 넘게 신호가 없으면 물속으로 봄 (마이크로비트가 1초마다 보냄)
+const fmtSec=s=>s>=60?`${Math.floor(s/60)}분 ${s%60}초`:`${s}초`;
+// 상태 변화 추적: 물에 들어가는 순간 기록, 시간 띠용 기록
+function trackState(d){
+  if(!d.lastAt) return;
+  const under=(now()-d.lastAt)/1000>gapOf(d);
+  if(under && !d.under){
+    d.under=true; d.diveStart=d.lastAt;
+    d.restBefore=Math.round((d.lastAt-(d.surfacedAt||d.lastAt))/1000);
+    const prev=d.dives[d.dives.length-1];
+    d.shortRest = !!(prev && prev.len>=60 && d.restBefore<S.t.minRest);
+  }
+  d.tl.push(under?1:0); if(d.tl.length>300) d.tl.shift();   // 최근 5분 (1초 단위)
+}
+function timeline(tl){
+  if(!tl.length) return "";
+  const W=300, x0=W-tl.length; let out="", i=0;
+  while(i<tl.length){ let j=i; while(j<tl.length&&tl[j]===tl[i]) j++; out+=`<rect x="${x0+i}" y="${tl[i]?0:6}" width="${j-i}" height="${tl[i]?14:2}" fill="${tl[i]?"var(--sea)":"var(--line)"}"/>`; i=j; }
+  return `<svg class="tl" viewBox="0 0 ${W} 14" preserveAspectRatio="none" aria-label="최근 5분 물속(짙은 막대)과 물 위">${out}</svg>`;
+}
+
+/* ================= 화면: 해녀 카드 ================= */
+function spark(hist){
+  const pts=hist.map((v,i)=>[i,v]).filter(p=>p[1]!=null);
+  if(pts.length<2) return `<svg class="spark" viewBox="0 0 120 34" aria-hidden="true"><text x="0" y="22" fill="var(--muted)" font-size="10">맥박 기록 없음</text></svg>`;
+  const lo=40, hi=190, x=i=>i*(120/59), y=v=>32-((Math.min(hi,Math.max(lo,v))-lo)/(hi-lo))*30;
+  const d=pts.map((p,j)=>(j?"L":"M")+x(p[0]).toFixed(1)+" "+y(p[1]).toFixed(1)).join(" ");
+  const last=pts[pts.length-1];
+  const band=`<rect x="0" y="${y(S.t.bpmHi)}" width="120" height="${y(S.t.bpmLo)-y(S.t.bpmHi)}" fill="var(--ok-bg)"/>`;
+  return `<svg class="spark" viewBox="0 0 120 34" preserveAspectRatio="none" aria-label="최근 맥박">${band}<path d="${d}" fill="none" stroke="var(--ink)" stroke-width="1.2" vector-effect="non-scaling-stroke"/><circle cx="${x(last[0])}" cy="${y(last[1])}" r="2" fill="var(--taewak)"/></svg>`;
+}
+function renderDivers(){
+  const box=$("divers"); const ids=[...divers.keys()].sort((a,b)=>a-b);
+  if(!ids.length){ box.innerHTML=port
+    ? `<p class="note">마이크로비트가 연결됐어요. 신호를 기다리는 중이에요. 부표 마이크로비트는 해녀가 <b>처음 물에 들어갈 때</b>부터 알려 주니, 해녀용 마이크로비트를 켜고 한 번 들어갔다 나오면 카드가 생겨요.</p>`
+    : `<p class="note">아직 받은 신호가 없어요. 해녀용 마이크로비트를 켜거나 시뮬레이션을 켜세요.</p>`; return; }
+  box.innerHTML=ids.map(id=>{
+    const d=divers.get(id), k=d.last||{}, lost=d.lastAt?Math.round((now()-d.lastAt)/1000):0;
+    const under=d.lastAt && lost>gapOf(d);
+    const bpm = under?"–":(k.bpm>0?k.bpm:(k.bpm===0?"--":"없음"));
+    const last=d.dives[d.dives.length-1], maxDive=d.dives.reduce((m,x)=>Math.max(m,x.len),0);
+    return `<article class="diver" data-lv="${d.level}">
+      <div class="stripe"></div>
+      <div class="diver-in">
+        <div class="diver-top"><span class="diver-name">${esc(nameOf(id))}<small>#${id}</small></span><span class="pill lv${d.level}">${LV[d.level]}</span></div>
+        <div class="state ${under?"under":"surface"}"><b>${under?"물질 중":"휴식 중"}</b><span>${under?"물속":"물 위"} <span class="mono">${fmtSec(under?lost:Math.round((now()-(d.surfacedAt||now()))/1000))}</span></span></div>
+        ${timeline(d.tl)}
+        <div class="metrics">
+          <div class="metric"><div class="k">잠수 횟수</div><div class="v">${d.dives.length}<small>번</small></div></div>
+          <div class="metric"><div class="k">최근 잠수</div><div class="v">${last?last.len:"-"}<small>초</small></div></div>
+          <div class="metric"><div class="k">최장 잠수</div><div class="v">${maxDive||"-"}<small>초</small></div></div>
+          <div class="metric"><div class="k">맥박 (물 위)</div><div class="v">${bpm}<small>${!under&&k.bpm>0?"회/분":""}</small></div></div>
+        </div>
+        <ul class="reasons">${d.reasons.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+        <div class="diver-foot"><span class="mono">오늘 작업 ${diveMinutes(d)}분째 · 신호 ${k.rssi??"-"}</span>${d.level>=2?`<button class="btn small" data-report="${id}">괜찮은지 확인</button>`:""}</div>
+      </div></article>`;
+  }).join("");
+}
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+$("divers").addEventListener("click",e=>{ const b=e.target.closest("[data-report]"); if(b) openEmergency(divers.get(+b.dataset.report), true, "관리자 요청"); });
+
+/* ================= 주기 점검 ================= */
+function tick(){
+  if(sim.on) simStep();
+  if(port && buoy.on && buoy.up) buoyFeed();   // 부표: 물 위에 있는 동안 "물 위" 신호를 대신 넣음
+  connInfo();
+  if(port && (buoy.last||buoy.info)){
+    const i=buoy.info, sig=i?` · 5초에 신호 ${i.rx}번${i.rx?` · 세기 ${i.rssi}`:""}`:"";
+    $("connText").textContent=`부표 연결됨${buoy.last?` · ${buoy.last.what} ${fmtSec(Math.round((now()-buoy.last.at)/1000))} 전`:""}${sig}`;
+  }
+  for(const d of divers.values()){
+    trackState(d);
+    const {level,reasons}=evaluate(d); d.level=level; d.reasons=reasons;
+    if(level!==d.prevLevel){
+      if(level>d.prevLevel && level>=1) log(`${nameOf(d.id)}: ${LV[level]} - ${reasons.join(", ")}`);
+      if(level<d.prevLevel) log(`${nameOf(d.id)}: ${LV[level]}(으)로 회복`);
+      if(level===2 && d.prevLevel<2){ toast(`⚠ ${nameOf(d.id)} 위험: ${reasons[0]}`); beep(660,250,2); }
+      if(level<3) d.reported=false;
+      d.prevLevel=level;
+    }
+    if(level===3 && !d.reported && now()>d.ackUntil && !emg.active) openEmergency(d,false);
+  }
+  try{ agentWatch(); }catch(e){ console.warn(e); }
+  { const all=[...divers.values()].filter(d=>d.lastAt), u=all.filter(d=>d.under).length; $("stateSum").textContent=all.length?`물질 중 ${u}명 · 휴식 중 ${all.length-u}명`:""; }
+  renderDivers();
+  $("clock").textContent=hhmm();
+}
+
+/* ================= 응급: AI 에이전트가 확인 → 비상 판단 → 모의 신고 ================= */
+// 1) 위급 감지 → 해녀 마이크로비트로 확인 신호 (소리·불빛)
+// 2) 해녀가 버튼을 누르면 → 가짜 경보로 판단, 해제
+// 3) 정해진 시간 안에 응답 없음 → 비상 상황으로 판단, 122·119 모의 신고
+// SOS 버튼은 해녀 본인이 도움을 요청한 것이므로 확인 없이 바로 신고
+// 시간 판단은 규칙으로 처리(AI가 느리거나 실패해도 신고가 늦어지지 않게), AI는 상황 알림과 신고 요약을 맡음
+const emg={active:false,diver:null,timer:null,left:0,stage:0,sent:false,via:""};
+async function sendToDiver(id){
+  if(port && port.writable) return await sendLine(`Q,${id}`);
+  if(sim.on && sim.st[id]){   // 시뮬레이션: 의식이 있는 상황이면 몇 초 뒤 버튼 응답
+    if(!["fall","dive","sos"].includes(sim.st[id].scenario)) setTimeout(()=>ingest(`A,${id}`), rnd(3000,6000));
+    return true;
+  }
+  return false;
+}
+function emgShow(step){
+  for(const [i,id] of [[0,"emgStep0"],[1,"emgStep1"],[2,"emgStep2"]]) $(id).hidden = i!==step;
+  $("emgF0").hidden = step!==0; $("emgF1").hidden = step!==1; $("emgF2").hidden = step!==2;
+  $("emg").dataset.step=step;
+}
+async function openEmergency(d, manual, via){
+  if(!d) return;
+  if(emg.active && emg.diver===d) return;
+  if(emg.active) closeEmg();
+  emg.active=true; emg.diver=d; emg.via=via||(manual?"관리자 요청":"자동 감지");
+  const dlg=$("emg"); if(!dlg.open) dlg.showModal();
+  beep(988,350,3);
+  if(d.last?.sos===1){   // 본인 SOS
+    log(`${nameOf(d.id)}: SOS 직접 요청 → 확인 없이 바로 신고`);
+    agentPost(`🚨 ${nameOf(d.id)}님이 SOS 버튼을 눌렀어요. 본인이 도움을 요청한 것이라 확인 절차 없이 바로 신고 화면을 열었어요.`,"alert");
+    emg.sent=false; doReport("SOS 버튼으로 본인이 직접 도움 요청"); return;
+  }
+  emg.stage=1; emg.left=S.t.countdown; emg.under=d.under;
+  $("emgNote").textContent=d.under?"초 안에 물 위로 올라오지 않으면 비상 상황으로 판단해 해양경찰·119 신고 화면으로 넘어갑니다.":"초 안에 해녀가 버튼으로 응답하지 않으면 비상 상황으로 판단해 해양경찰·119 신고 화면으로 넘어갑니다.";
+  $("emgTitle").textContent=`${nameOf(d.id)} 상태 확인 중`;
+  $("emgWhy").textContent=`감지 내용: ${d.reasons.join(", ")}`;
+  $("emgCount").textContent=emg.left;
+  emgShow(1);
+  if(d.under){
+    // 물속이라 라디오가 닿지 않음 → 본인 확인 대신 주변 해녀에게 도움 신호, 올라오면 자동 해제
+    const ok=await sendLine(`H,${d.id}`);
+    $("emgMsg").textContent=`물속이라 ${nameOf(d.id)} 삼촌에게는 신호가 닿지 않아요. 주변 해녀들 마이크로비트에 도움 신호(${ok?"보냄":"못 보냄"})를 보내 근처를 살피게 했어요. 그 사이 물 위로 올라오면 자동으로 해제돼요.`;
+    log(`${nameOf(d.id)}: 물속 위급 → 주변 해녀에게 도움 신호 ${ok?"보냄":"못 보냄"}, ${emg.left}초 대기`);
+    agentPost(`⚠ ${nameOf(d.id)} 삼촌이 물속에서 ${fmtSec(Math.round((now()-d.lastAt)/1000))}째 안 올라와요. 물속이라 본인 확인이 안 돼서 주변 해녀들에게 도움 신호를 보냈어요. ${emg.left}초 안에 올라오지 않으면 비상으로 판단하고 신고할게요.`,"alert");
+    clearInterval(emg.timer);
+    emg.timer=setInterval(()=>{
+      emg.left--; $("emgCount").textContent=Math.max(0,emg.left);
+      if(emg.left%5===0 && emg.left>0) beep(988,200,1);
+      if(emg.left<=0){ clearInterval(emg.timer); log(`${nameOf(d.id)}: ${S.t.countdown}초 더 기다려도 안 올라옴 → 비상 상황으로 판단`); doReport(`물속에서 안 올라옴 (신호 끊긴 지 ${Math.round((now()-d.lastAt)/1000)}초)`); }
+    },1000);
+    return;
+  }
+  $("emgMsg").textContent="해녀의 마이크로비트로 확인 신호를 보내는 중…";
+  emg.sent=await sendToDiver(d.id);
+  $("emgMsg").textContent = emg.sent
+    ? "확인 신호를 보냈어요. 해녀의 마이크로비트가 소리와 불빛으로 알리고 있어요. 해녀가 버튼을 누르면 가짜 경보로 처리합니다."
+    : "해녀에게 신호를 보낼 수 없어요(연결 없음). 관리자가 직접 눈으로 확인해 주세요.";
+  log(`${nameOf(d.id)}: AI 에이전트가 확인 신호 ${emg.sent?"보냄":"못 보냄"}, ${emg.left}초 응답 대기`);
+  agentPost(`⚠ ${nameOf(d.id)}님에게 이상이 감지됐어요 (${d.reasons[0]}).\n괜찮은지 마이크로비트로 확인 신호를 보냈어요. ${emg.left}초 안에 응답이 없으면 비상 상황으로 판단하고 신고를 진행할게요.`,"alert");
+  clearInterval(emg.timer);
+  emg.timer=setInterval(()=>{
+    emg.left--; $("emgCount").textContent=Math.max(0,emg.left);
+    if(emg.left%5===0 && emg.left>0) beep(988,200,1);
+    if(emg.left<=0){ clearInterval(emg.timer);
+      log(`${nameOf(d.id)}: ${S.t.countdown}초 동안 응답 없음 → 비상 상황으로 판단`);
+      doReport(`확인 신호에 ${S.t.countdown}초 동안 응답 없음`); }
+  },1000);
+}
+function onSurface(id,len){
+  const d=divers.get(id); if(!d||!(emg.active && emg.diver===d && emg.stage===1)) return;
+  clearInterval(emg.timer); d.ackUntil=now()+60000;
+  if(sim.on && sim.st[id] && sim.st[id].scenario!=="normal"){ sim.st[id].scenario="normal"; renderSim(); }
+  $("emgTitle").textContent=`${nameOf(id)} 올라왔어요`;
+  $("emgOk").textContent=`${nameOf(id)} 삼촌이 ${len}초 잠수 후 물 위로 올라와 신호가 다시 잡혔어요. 신고하지 않았어요. 오래 잠수했으니 물 위에서 충분히 쉬게 해 주세요.`;
+  emgShow(0); emg.stage=0;
+  log(`${nameOf(id)}: 물 위로 올라와 비상 해제 (${len}초 잠수)`);
+  agentPost(`✅ ${nameOf(id)} 삼촌이 ${len}초 만에 올라왔어요. 신고는 멈췄어요. 이번 잠수가 길었으니 최소 ${Math.max(S.t.minRest,Math.round(len/2))}초는 물 위에서 쉬게 해 주세요.`);
+  setTimeout(()=>{ if(emg.diver===d && emg.stage===0) closeEmg(); },5000);
+}
+function onAck(id){
+  const d=divers.get(id); if(!d) return;
+  if(emg.active && emg.diver===d && emg.stage===1){
+    clearInterval(emg.timer);
+    d.ackUntil=now()+120000;
+    const took=S.t.countdown-emg.left;
+    log(`${nameOf(id)}: ${took}초 만에 버튼 응답 → 가짜 경보로 판단, 2분간 경보 보류`);
+    if(sim.on && sim.st[id]){ sim.st[id].scenario="normal"; sim.st[id].still=0; renderSim(); }
+    $("emgTitle").textContent=`${nameOf(id)} 괜찮아요`;
+    $("emgOk").textContent=`${nameOf(id)}님이 ${took}초 만에 버튼으로 응답했어요. 가짜 경보로 판단해 신고하지 않았어요. 2분 동안은 같은 경보를 다시 띄우지 않습니다.`;
+    emgShow(0); emg.stage=0;
+    agentPost(`✅ ${nameOf(id)}님이 ${took}초 만에 응답했어요. 가짜 경보로 판단해 신고하지 않았어요. 그래도 물 밖으로 나와 잠시 쉬도록 알려주세요.`);
+    setTimeout(()=>{ if(emg.diver===d && emg.stage===0) closeEmg(); },5000);
+  } else log(`${nameOf(id)}: 버튼 응답 받음`);
+}
+function reportText(d,why){
+  const k=d.last||{}, r=S.report;
+  const loc = (r.lat&&r.lon) ? `위도 ${r.lat}, 경도 ${r.lon}` : "좌표 미설정";
+  return `[해녀 응급 신고 - 숨비 지킴이 자동 작성]
+시각: ${new Date().toLocaleString("ko-KR")}
+장소: ${r.place||"(장소 미설정)"} / ${loc}
+대상: ${nameOf(d.id)} (장비 번호 ${d.id})
+상황: ${d.reasons.join(", ")}
+비상 판단 근거: ${why}
+마지막 측정: 맥박 ${k.bpm>0?k.bpm+"회/분":"측정 안 됨"}, 착용부 온도 ${Number.isFinite(k.temp)?k.temp+"℃":"측정 안 됨"}, 무움직임 ${k.still??"-"}초, 마지막 신호 ${d.lastAt?Math.round((now()-d.lastAt)/1000):"-"}초 전
+관리자 연락처: ${r.phone||"(미설정)"}
+※ 해상 사고는 해양경찰 122, 구급은 119`;
+}
+async function doReport(why){
+  clearInterval(emg.timer);
+  const d=emg.diver; d.reported=true; emg.stage=2;
+  why = why || "관리자가 바로 신고를 요청함";
+  const text=reportText(d,why);
+  $("emgText").value=text;
+  $("emgTitle").textContent=`${nameOf(d.id)} 비상 상황 · 신고 화면`;
+  emgShow(2);
+  log(`${nameOf(d.id)}: 비상 상황 판단 → 해양경찰 122·119 모의 신고 (실제 전송 안 됨)`);
+  const base=`🚨 ${nameOf(d.id)}님 비상 상황이에요. ${why}.\n해양경찰 122·119 신고 화면을 열었어요 (시연용 모의 신고).`;
+  const m=agentPost(base+"\n\n지금 할 일을 정리하는 중…","alert");
+  let todo="1) 122 또는 119에 전화해 신고 내용을 불러주세요.\n2) 가까운 해녀와 배에 마지막 위치를 알려 수색을 시작하세요.\n3) 구조되면 숨을 쉬는지 확인하고, 숨을 안 쉬면 바로 심폐소생술을 하세요.";
+  if(aiReady()){
+    try{ const out=await geminiText(`해녀 응급 상황이다. 아래 신고 내용을 보고, 현장 관리자가 지금 당장 할 일을 번호 붙여 3가지, 한 줄씩 아주 짧게 써라. 인사말과 설명 없이 목록만.\n\n${text}`); if(out) todo=out; }catch(e){}
+  }
+  m.textContent=base+"\n\n지금 할 일:\n"+todo;
+}
+$("emgNow").onclick=()=>doReport("관리자가 바로 신고를 요청함");
+$("emgCancel").onclick=()=>{ clearInterval(emg.timer); const d=emg.diver; d.ackUntil=now()+60000; log(`${nameOf(d.id)}: 관리자가 직접 확인해 이상 없음, 1분간 신고 보류`);
+  agentPost(`관리자가 ${nameOf(d.id)}님을 직접 확인해 이상 없다고 해서 신고를 멈췄어요.`);
+  if(sim.on && sim.st[d.id]) { sim.st[d.id].scenario="normal"; sim.st[d.id].still=0; renderSim(); }
+  closeEmg(); };
+$("emgClose").onclick=closeEmg; $("emgOkClose").onclick=closeEmg;
+$("emgCopy").onclick=async()=>{ const ta=$("emgText"); try{ await navigator.clipboard.writeText(ta.value); toast("신고 내용을 복사했어요"); }catch(e){ ta.focus(); ta.select(); toast("텍스트가 선택됐어요. 복사하세요"); } };
+$("emg").addEventListener("cancel",e=>e.preventDefault());
+function closeEmg(){ clearInterval(emg.timer); emg.active=false; emg.stage=0; if($("emg").open) $("emg").close(); }
+function emgStatus(){
+  if(!emg.active) return "진행 중인 비상 처리 없음";
+  return `${nameOf(emg.diver.id)}: ${["가짜 경보로 해제됨","확인 신호 보내고 응답 대기 중("+emg.left+"초 남음)","비상 판단, 신고 화면 열림"][emg.stage]}`;
+}
+
+/* ================= 시뮬레이터 ================= */
+const SCEN={normal:"정상 물질 (잠수·휴식 반복)",dive:"물속에서 안 올라옴",longdive:"오래 잠수 후 올라옴",hr:"맥박 이상",cold:"저체온",fakefall:"넘어졌지만 괜찮음 (응답함)",fall:"쓰러짐 (응답 없음)",sos:"SOS 버튼",long:"오래 물질 (시간 초과)"};
+const sim={on:true, st:{1:{scenario:"normal",still:0,phase:0},2:{scenario:"normal",still:0,phase:3},3:{scenario:"hr",still:0,phase:6}}};
+function renderSim(){
+  $("simGrid").innerHTML=Object.keys(sim.st).map(id=>`<label>${esc(nameOf(+id))}<select data-sim="${id}">${Object.entries(SCEN).map(([k,v])=>`<option value="${k}" ${sim.st[id].scenario===k?"selected":""}>${v}</option>`).join("")}</select></label>`).join("");
+}
+$("simGrid").addEventListener("change",e=>{ const s=e.target.closest("[data-sim]"); if(!s) return; const st=sim.st[s.dataset.sim]; st.scenario=s.value; st.still=0; st.longSet=false; st.jumped=false; if(s.value!=="normal") st.cyc=null; const d=divers.get(+s.dataset.sim); if(d) d.ackUntil=0; });
+$("simOn").addEventListener("change",e=>{ sim.on=e.target.checked; setConn(); });
+function rnd(a,b){ return a+Math.random()*(b-a); }
+function simStep(){
+  for(const [id,st] of Object.entries(sim.st)){
+    st.phase++;
+    const d0=divers.get(+id), t=now();
+    // 물속에서 안 올라옴 / 오래 잠수: 시연이 길어지지 않게 이미 오래 잠수한 것처럼 시작
+    if((st.scenario==="dive"||st.scenario==="longdive") && !st.jumped && d0){ d0.lastAt=t-(S.t.lostCrit-15)*1000; d0.under=false; trackState(d0); st.jumped=true; st.upAt=t+(15+Math.round(S.t.countdown/2))*1000; }
+    if(st.scenario==="dive") continue;            // 물속: 신호 안 옴
+    if(st.scenario==="longdive"){ if(t<st.upAt) continue; st.scenario="normal"; st.cyc={under:false,until:t+30000}; renderSim(); }
+    // 평소: 물속(신호 없음) 35~75초, 물 위 20~40초를 반복
+    if(["normal","hr","cold","long"].includes(st.scenario)){
+      if(!st.cyc) st.cyc={under:false, until:t+rnd(3,20)*1000};
+      if(t>st.cyc.until){ st.cyc.under=!st.cyc.under; st.cyc.until=t+(st.cyc.under?rnd(35,75):rnd(20,40))*1000; }
+      if(st.cyc.under) continue;
+    }
+    if(st.scenario==="long" && !st.longSet){ const d=divers.get(+id), g=seaGuide(); if(d){ d.sessionStart=now()-((g?.diveMin||60)+3)*60000; d.nudged=false; st.longSet=true; } }
+    let temp=Math.round(rnd(16.5,18.2)), bpm=Math.round(rnd(72,96)+6*Math.sin(st.phase/5)), fall=0, sos=0;
+    if(st.scenario==="fall"||st.scenario==="fakefall"){ fall=1; st.still++; bpm=st.scenario==="fall"?Math.round(rnd(46,54)):bpm; }
+    else st.still = Math.random()<0.8?0:Math.round(rnd(1,6));
+    if(st.scenario==="hr") bpm=Math.round(rnd(158,176));
+    if(st.scenario==="cold") temp=Math.round(rnd(10,11.8));
+    if(st.scenario==="sos") sos=1;
+    ingest(`D,${id},${temp},${bpm},${fall},${st.still},${sos},${Math.round(rnd(-70,-48))}`);
+  }
+}
+
+/* ================= 마이크로비트 (Web Serial) ================= */
+let port=null, reading=false;
+// 진단: USB로 받은 줄 수와 마지막 줄을 연결 표시에 보여 줌 (신호는 오는데 화면이 안 바뀔 때 원인 찾기)
+const rx={n:0, last:"", at:0, odd:0, since:0};
+function serialOdd(line){
+  if(!port || !line) return;
+  rx.odd++;
+  if(rx.odd<=5) log(`알아보지 못한 줄: "${line.slice(0,40)}" (숨비 형식은 D,번호,온도,… 로 시작해야 해요)`);
+  if(rx.odd===5) log("알아보지 못한 줄이 계속 와요. 수신용 마이크로비트에 receiver_python.py를 넣었는지 확인해 주세요.");
+}
+function connInfo(){
+  if(!port || buoy.last || buoy.info) return;
+  const s=Math.round((now()-(rx.at||rx.since||now()))/1000);
+  $("connText").textContent = rx.n
+    ? `마이크로비트 연결됨 · 받은 줄 ${rx.n}개 · 마지막 ${s}초 전 "${rx.last.slice(0,24)}"`
+    : rx.hb && now()-rx.hb<8000   // 수신기의 3초 "HB" 줄은 오는데 해녀 신호가 없음 → 해녀용 쪽 문제
+    ? `수신기 연결 잘 됨 · 해녀 신호 아직 0개 (${s}초째) — 해녀용 마이크로비트를 켜고, B로 끊었으면 B를 한 번 더 누르세요`
+    : `마이크로비트 연결됨 · 받은 줄 0개 (${s}초째)${s>=5?" — 메이크코드 창을 닫고, 수신용에 receiver_python.py를 넣었는지 확인하세요":""}`;
+}
+function setConn(){
+  const dot=$("connDot"), txt=$("connText");
+  dot.className="dot"+(port?" on":(sim.on?" sim":""));
+  txt.textContent=port?"마이크로비트 연결됨":(sim.on?"시뮬레이션 중":"연결 안 됨");
+  $("btnSerial").textContent=port?"연결 끊기":"마이크로비트 연결";
+}
+$("btnSerial").onclick=async()=>{
+  if(port){ reading=false; try{ await port.close(); }catch(e){} port=null; setConn(); log("마이크로비트 연결 끊음"); return; }
+  if(!("serial" in navigator)){ toast("이 브라우저는 USB 연결을 지원하지 않아요. PC의 크롬·엣지에서 파일로 열어주세요."); return; }
+  try{
+    const p=await navigator.serial.requestPort();
+    await p.open({baudRate:115200});   // 다 열린 뒤에 port에 넣음 (여는 중에 "0개 (1793601019초째)"처럼 보이지 않게)
+    port=p; sim.on=false; $("simOn").checked=false; divers.clear(); Object.assign(buoy,{on:false,up:false,sosUntil:0,alerted:false,last:null,info:null}); Object.assign(rx,{n:0,last:"",at:0,odd:0,since:now(),hb:0,hbGot:0});
+    setConn(); log("수신용 마이크로비트 연결됨"); readLoop();
+  }catch(e){ port=null; setConn(); toast("연결하지 못했어요: "+(e.message||e)); }
+};
+async function readLoop(){
+  reading=true; const dec=new TextDecoder(); let buf="";
+  while(port && port.readable && reading){
+    const reader=port.readable.getReader();
+    try{ while(reading){ const {value,done}=await reader.read(); if(done) break;
+        buf+=dec.decode(value,{stream:true}); let i; while((i=buf.indexOf("\n"))>=0){ const ln=buf.slice(0,i).trim(); buf=buf.slice(i+1); if(!ln) continue; if(ln.startsWith("HB,")){ rx.hb=now(); rx.hbGot=parseInt(ln.slice(3))||0; continue; } rx.n++; rx.last=ln; rx.at=now(); ingest(ln); } } }
+    catch(e){ log("수신 오류: "+(e.message||e)); }
+    finally{ reader.releaseLock(); }
+  }
+}
+
+/* ================= 공공데이터 연결 ================= */
+// 국립해양조사원 조위관측소 (관측소 코드는 바다누리 기준). reg = 기상청 중기해상예보 구역
+const STATIONS=[
+  {code:"DT_0022",name:"제주 성산포",reg:"12B10500"},{code:"DT_0004",name:"제주",reg:"12B10500"},
+  {code:"DT_0010",name:"서귀포",reg:"12B10500"},{code:"DT_0023",name:"모슬포",reg:"12B10500"},
+  {code:"DT_0021",name:"추자도",reg:"12B10500"},{code:"DT_0029",name:"거제도",reg:"12B20000"},
+  {code:"DT_0014",name:"통영",reg:"12B20000"},{code:"DT_0005",name:"부산",reg:"12B20000"},
+  {code:"DT_0016",name:"여수",reg:"12B10000"},{code:"DT_0027",name:"완도",reg:"12B10000"},
+  {code:"DT_0020",name:"울산",reg:"12C10000"},{code:"DT_0091",name:"포항",reg:"12C10000"},
+  {code:"DT_0011",name:"후포",reg:"12C10000"},{code:"DT_0006",name:"묵호",reg:"12C20000"},
+  {code:"DT_0012",name:"속초",reg:"12C30000"},{code:"DT_0013",name:"울릉도",reg:"12C20000"}
+];
+const REG_NAME={"12A20000":"서해중부","12A30000":"서해남부","12B10000":"남해서부","12B20000":"남해동부","12B10500":"제주도","12C10000":"동해남부","12C20000":"동해중부","12C30000":"동해북부"};
+function station(q){
+  q=String(q||"").trim();
+  return STATIONS.find(s=>s.code===q) || STATIONS.find(s=>q && (s.name.includes(q)||q.includes(s.name.replace("제주 ",""))) ) || null;
+}
+let PROXY=false;   // server.py로 열면 true (키는 서버에 보관, CORS 문제 없음)
+let PROXY_WHY="";   // 서버 확인이 안 된 이유 (화면 "데모 수온 (…)"에 보여 줌)
+async function detectProxy(){
+  // 서버가 막 깨어날 때(콜드 스타트) 한 번 실패할 수 있어 3번까지 다시 해 봄
+  for(let i=0;i<3 && !PROXY;i++){
+    if(i) await new Promise(r=>setTimeout(r,1500));
+    try{
+      const ctl=new AbortController(), to=setTimeout(()=>ctl.abort(),8000);
+      const r=await fetch("/api/health",{cache:"no-store",signal:ctl.signal}); clearTimeout(to);
+      const text=await r.text(); let j=null; try{ j=JSON.parse(text); }catch(e){}
+      if(r.ok && j && j.ok){ PROXY=true; S.proxyInfo=j; PROXY_WHY=""; }
+      else PROXY_WHY = location.protocol==="file:" ? "파일로 열었어요" : `서버 응답 ${r.status}${j?"":" (JSON 아님)"}`;
+    }catch(e){ PROXY_WHY = location.protocol==="file:" ? "파일로 열었어요" : (e.name==="AbortError"?"서버 응답 없음(8초)":"서버 연결 실패"); }
+  }
+  setMode(); apiNote();
+}
+const hasData=()=>PROXY || !!S.water.key;
+function apiNote(){
+  const el=$("apiModeNote"); if(!el) return;
+  el.textContent = PROXY ? "server.py로 실행 중이에요. 서버에 넣어둔 인증키를 씁니다(여기 칸은 비워도 돼요)."
+    : "server.py 없이 열었어요. 인증키를 넣으면 브라우저에서 직접 호출하지만, 공공데이터포털이 막으면(CORS) 데모 값을 씁니다. server.py 실행을 권장해요.";
+}
+async function dataGo(path,params){
+  const qs=new URLSearchParams(params).toString();
+  const url = PROXY ? `/api/datago?path=${encodeURIComponent(path)}&${qs}`
+                    : `https://apis.data.go.kr/${path}?serviceKey=${S.water.key}&${qs}`;   // Encoding 키는 그대로 붙임
+  const res=await fetch(url,{cache:"no-store"}); const text=await res.text();
+  let j=null; try{ j=JSON.parse(text); }catch(e){}
+  if(!j){ const m=text.match(/<returnAuthMsg>([^<]+)|<resultMsg>([^<]+)|<errMsg>([^<]+)/);
+    throw new Error("공공데이터 응답 오류: "+(m?(m[1]||m[2]||m[3]):text.slice(0,120))+(/SERVICE_KEY|등록되지/.test(text)?" (새 키는 승인 후 1시간쯤 지나야 쓸 수 있어요)":"")); }
+  if(j.error) throw new Error(j.error.message||String(j.error));
+  const h=j.response?.header||j.header; const code=h?.resultCode;
+  if(code==="03" || /NODATA/.test(h?.resultMsg||"")) return {nodata:true};   // 자료 없음은 오류가 아님
+  if(code && code!=="00" && code!=="0") throw new Error(`공공데이터 오류 ${code}: ${h.resultMsg||""}`);
+  return j;
+}
+function findItems(o){   // 응답 안에서 레코드 배열을 찾음
+  if(Array.isArray(o)) return o.length && typeof o[0]==="object" ? o : null;
+  if(o && typeof o==="object"){ if(o.item && !Array.isArray(o.item) && typeof o.item==="object") return [o.item];
+    for(const v of Object.values(o)){ const f=findItems(v); if(f) return f; } }
+  return null;
+}
+function ymd(d){ return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0"); }
+function kstNow(){ const d=new Date(); return new Date(d.getTime()+(d.getTimezoneOffset()+540)*60000); }  // 한국 시각
+function today(){ return ymd(kstNow()); }
+const TEMP_KEYS=["wtem","water_temp","wtrTmp","wtr_tmp","wTemp","wt","temp"];
+function tempKey(item){
+  if(S.water.tempPath && item[S.water.tempPath]!=null) return S.water.tempPath;
+  return TEMP_KEYS.find(k=>item[k]!=null && !Number.isNaN(parseFloat(item[k])))
+      || Object.keys(item).find(k=>/tem|tmp/i.test(k) && !Number.isNaN(parseFloat(item[k])));
+}
+async function waterItems(code,date){
+  const j=await dataGo("1192136/surveyWaterTemp/GetSurveyWaterTempApiService",{type:"json",obsCode:code,reqDate:date,min:"10",pageNo:"1",numOfRows:"300"});
+  return {j,items:findItems(j)||[]};
+}
+async function getWater(q){
+  const st=station(q) || {code:String(q||"").trim(),name:String(q||"").trim(),reg:null};
+  if(!hasData()){
+    let h=0; for(const c of st.code) h=(h*31+c.charCodeAt(0))>>>0;
+    return {site:st.name,code:st.code,reg:st.reg,temp:Math.round((13+(h%70)/10)*10)/10,source:"데모 수온 (API 미연결"+(PROXY_WHY?": "+PROXY_WHY:"")+")",time:new Date(),obsTime:null};
+  }
+  let {items}=await waterItems(st.code,today());
+  if(!items.length){ const y=kstNow(); y.setDate(y.getDate()-1); ({items}=await waterItems(st.code,ymd(y))); }   // 자정 직후엔 어제 자료
+  if(!items.length) throw new Error(`${st.name} 관측소는 지금 수온 자료가 없어요. 가까운 다른 관측소를 골라보세요`);
+  const k=tempKey(items[0]);
+  if(!k) throw new Error("응답에서 수온 항목을 찾지 못했어요. 설정 > '수온 응답 보기'로 항목 이름을 확인해 넣어주세요");
+  const tk=Object.keys(items[0]).find(x=>/dt|time|date/i.test(x));
+  const valid=items.filter(it=>!Number.isNaN(parseFloat(it[k])));
+  if(tk) valid.sort((a,b)=>String(a[tk]).localeCompare(String(b[tk])));
+  const last=valid[valid.length-1];
+  return {site:st.name,code:st.code,reg:st.reg,temp:Math.round(parseFloat(last[k])*10)/10,source:"국립해양조사원 실측 수온",time:new Date(),obsTime:tk?String(last[tk]):null};
+}
+function assessDive(w){
+  const T=S.t, r=[]; let lv=0; const up=(l,m)=>{lv=Math.max(lv,l); r.push(m);};
+  if(w.temp<T.seaMin) up(2,`수온 ${w.temp}℃로 너무 차가워 저체온 위험이 큼`);
+  else if(w.temp<T.seaWarn) up(1,`수온 ${w.temp}℃, 물질 시간을 줄이고 자주 몸을 녹이세요`);
+  else if(w.temp>T.seaHigh) up(1,`수온 ${w.temp}℃로 높아 탈수·피로 주의`);
+  else r.push(`수온 ${w.temp}℃로 물질하기 알맞음`);
+  return {level:lv, verdict:["물질 적합","주의하며 물질","물질 부적합"][lv], reasons:r};
+}
+
+/* 기상청 중기해상예보: 4~10일 뒤 파고 */
+function tmFc(){ const k=kstNow(), h=k.getHours();
+  if(h>=18) return ymd(k)+"1800"; if(h>=6) return ymd(k)+"0600"; k.setDate(k.getDate()-1); return ymd(k)+"1800"; }
+function waveVerdict(max){ return max==null?null : max>=S.t.waveMax?2 : max>=S.t.waveWarn?1 : 0; }
+async function getSeaFcst(reg){
+  reg=reg||station(S.site)?.reg||"12B10500";
+  const tm=tmFc(); const base=new Date(+tm.slice(0,4),+tm.slice(4,6)-1,+tm.slice(6,8));
+  const mk=(n,min,max,wf)=>{ const d=new Date(base); d.setDate(d.getDate()+n);
+    return {date:`${d.getMonth()+1}/${d.getDate()}(${"일월화수목금토"[d.getDay()]})`,day:n,waveMin:min,waveMax:max,weather:wf||"",level:waveVerdict(max)}; };
+  if(!hasData()){
+    const days=[]; for(let n=4;n<=10;n++){ const a=Math.round((0.5+((n*7+reg.length)%9)/6)*10)/10; days.push(mk(n,Math.max(0.5,a-0.5),a,["맑음","구름많음","흐림","흐리고 비"][n%4])); }
+    return {reg,regName:REG_NAME[reg]||reg,tmFc:tm,days,source:"데모 예보 (API 미연결"+(PROXY_WHY?": "+PROXY_WHY:"")+")"};
+  }
+  const j=await dataGo("1360000/MidFcstInfoService/getMidSeaFcst",{dataType:"JSON",pageNo:"1",numOfRows:"10",regId:reg,tmFc:tm});
+  const it=(findItems(j)||[])[0]; if(!it) throw new Error("해상예보 자료가 아직 없어요 (발표 직후일 수 있어요)");
+  const num=v=>v==null||v===""?null:parseFloat(v);
+  const days=[];
+  for(let n=3;n<=10;n++){
+    if(it[`wh${n}AAm`]!=null){ const mx=Math.max(num(it[`wh${n}BAm`])??0,num(it[`wh${n}BPm`])??0);
+      days.push(mk(n,Math.min(num(it[`wh${n}AAm`])??9,num(it[`wh${n}APm`])??9),mx,[it[`wf${n}Am`],it[`wf${n}Pm`]].filter(Boolean).join(" → "))); }
+    else if(it[`wh${n}A`]!=null) days.push(mk(n,num(it[`wh${n}A`]),num(it[`wh${n}B`]),it[`wf${n}`]));
+  }
+  return {reg,regName:REG_NAME[reg]||reg,tmFc:tm,days,source:"기상청 중기해상예보"};
+}
+
+/* 화면 */
+function renderWater(w,a){
+  const T=S.t, lo=8, hi=30, pct=v=>Math.max(0,Math.min(100,(v-lo)/(hi-lo)*100));
+  const seg=(a1,b1,c)=>`<i style="width:${pct(b1)-pct(a1)}%;background:${c}"></i>`;
+  const obs=w.obsTime?` · 관측 ${esc(w.obsTime.replace(/^\d{4}-?(\d\d)-?(\d\d)[ T]?(\d\d):?(\d\d).*/,"$1/$2 $3:$4"))}`:"";
+  $("seaSource").textContent=`${w.source}${obs}`;
+  $("seaOut").innerHTML=`<div class="sea-result">
+     <div class="temp-big mono">${w.temp}<small>℃</small></div>
+     <div><div class="verdict ${["v-ok","v-warn","v-bad"][a.level]}">${a.verdict}</div>
+       <div class="sea-meta"><span>관측소 <b>${esc(w.site||"-")}</b></span><span class="mono">${esc(w.code||"")}</span></div></div>
+   </div>
+   <div class="scale" aria-label="수온 기준 막대">
+     <div class="scale-bar">${seg(lo,T.seaMin,"var(--danger)")}${seg(T.seaMin,T.seaWarn,"var(--warn)")}${seg(T.seaWarn,T.seaHigh,"var(--ok)")}${seg(T.seaHigh,hi,"var(--warn)")}</div>
+     <div class="scale-marker"><span style="left:${pct(w.temp)}%"></span></div>
+     <div class="scale-ticks"><span style="left:0">${lo}℃</span><span style="left:${pct(T.seaMin)}%">${T.seaMin}</span><span style="left:${pct(T.seaWarn)}%">${T.seaWarn}</span><span style="left:${pct(T.seaHigh)}%">${T.seaHigh}</span><span style="left:100%">${hi}℃</span></div>
+   </div>
+   <ul class="reasons" style="margin-top:8px">${a.reasons.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`;
+}
+function renderFcst(f){
+  const pill=l=>l==null?"-":`<span class="pill lv${[0,1,2][l]}">${["적합","주의","부적합"][l]}</span>`;
+  $("fcstOut").innerHTML=`<h3>앞으로의 파고 전망 · ${esc(f.regName)} <span class="note" style="font-weight:400">${esc(f.source)}</span></h3>
+   <div class="fcst-wrap"><table><thead><tr><th>날짜</th><th>파고(m)</th><th>날씨</th><th>물질</th></tr></thead><tbody>
+   ${f.days.map(d=>`<tr><td>${d.date}</td><td class="num">${d.waveMin??"-"}~${d.waveMax??"-"}</td><td>${esc(d.weather)}</td><td>${pill(d.level)}</td></tr>`).join("")}
+   </tbody></table></div><p class="note" style="margin:6px 0 0">기상청 중기예보는 4일 뒤부터 나와요. 오늘 판단은 실측 수온으로 합니다.</p>`;
+}
+// 최근 조회 결과 (AI가 다시 부르지 않고 바로 쓰도록 보관, 10분 유효)
+const LAST={sea:null,fcst:null};
+const fresh=x=>x && Date.now()-x.at<600000;
+async function checkSea(site){
+  if(!PROXY && location.protocol!=="file:") await detectProxy();   // 처음에 서버 확인이 실패했으면 다시 해 봄
+  try{ const w=await getWater(site); const a=assessDive(w); renderWater(w,a); const r={...w, ...a}; LAST.sea={code:w.code,at:Date.now(),r}; return r; }
+  catch(e){ $("seaOut").innerHTML=`<p class="note" style="color:var(--danger)">${esc(e.message||e)}</p>${PROXY?"":`<p class="note">브라우저 직접 호출이 막혔을 수 있어요(CORS). server.py로 실행하면 해결돼요.</p>`}`; return {error:String(e.message||e)}; }
+}
+async function checkFcst(site){
+  try{ const f=await getSeaFcst(station(site)?.reg); renderFcst(f); LAST.fcst={reg:f.reg,at:Date.now(),r:f}; return f; }
+  catch(e){ $("fcstOut").innerHTML=`<p class="note" style="color:var(--danger)">해상예보: ${esc(e.message||e)}</p>`; return {error:String(e.message||e)}; }
+}
+$("seaSite").innerHTML=STATIONS.map(s=>`<option value="${s.code}">${s.name} (${REG_NAME[s.reg]})</option>`).join("");
+$("seaSite").value=station(S.site)?.code||"DT_0022";
+$("seaForm").onsubmit=e=>{ e.preventDefault(); S.site=$("seaSite").value; save(); checkSea(S.site); checkFcst(S.site); };
+// 바다를 바꾸면 바로 다시 조회 (선택과 결과가 어긋나지 않게)
+$("seaSite").addEventListener("change",()=>{ $("seaOut").innerHTML=`<p class="note">불러오는 중…</p>`; $("seaForm").requestSubmit(); });
+
+/* ================= AI 에이전트 ================= */
+const chatEl=$("chat");
+// 에이전트가 먼저 말을 거는 알림 (비상 처리 상황)
+function agentPost(text,cls){ const m=say("bot",text); if(cls) m.classList.add(cls); return m; }
+async function geminiText(prompt){ sysNow=SYSTEM(); const c=await gemini([{role:"user",parts:[{text:prompt}]}],true); return (c.parts||[]).map(p=>p.text||"").join("").trim(); }
+function step(t){ if(!curTrace) curTrace=newTrace("에이전트 작업 중"); return curTrace.add(t); }
+function say(role,text){ if(role==="tool"){ return step(String(text).replace(/^🔧\s*/,"")); } const m=document.createElement("div"); m.className="msg "+role; m.textContent=text; chatEl.append(m); chatEl.scrollTop=chatEl.scrollHeight; return m; }
+const aiReady=()=>!!S.ai.key || !!(PROXY && S.proxyInfo?.gemini);
+function setMode(){ $("agentMode").textContent=aiReady()?`Gemini · ${S.ai.model}`:"규칙 기반 (AI 키 없음)"; }
+
+function diversStatus(){
+  return [...divers.values()].sort((a,b)=>a.id-b.id).map(d=>({id:d.id,name:nameOf(d.id),level:LV[d.level],reasons:d.reasons,
+    bpm:d.last?.bpm>0?d.last.bpm:null,temp:Number.isFinite(d.last?.temp)?d.last.temp:null,still_sec:d.last?.still??null,
+    seconds_since_signal:d.lastAt?Math.round((now()-d.lastAt)/1000):null, dive_min:diveMinutes(d),
+    state:d.lastAt?(d.under?"물질 중(물속)":"휴식 중(물 위)"):"신호 없음", under_sec:d.under?Math.round((now()-d.lastAt)/1000):0,
+    rest_sec:!d.under&&d.surfacedAt?Math.round((now()-d.surfacedAt)/1000):0, dives:d.dives.length,
+    last_dive:d.dives.length?d.dives[d.dives.length-1].len:null, max_dive:d.dives.reduce((m,x)=>Math.max(m,x.len),0)}));
+}
+const STATION_LIST=STATIONS.map(s=>s.name).join(", ");
+const TOOLS=[{functionDeclarations:[
+  {name:"get_divers_status",description:"현재 모든 해녀의 건강 상태(맥박, 착용부 온도, 무움직임 시간, 마지막 신호 이후 초, 경보 단계)를 가져온다.",parameters:{type:"object",properties:{}}},
+  {name:"check_sea_conditions",description:"조위관측소의 오늘 실측 수온을 조회하고 물질 적합 여부를 규칙으로 판정한다. 오늘 물질 가능 여부를 물을 때 사용.",
+    parameters:{type:"object",properties:{site:{type:"string",description:`관측소 이름 또는 코드. 가능한 이름: ${STATION_LIST}. 생략하면 사용자가 오늘 선택한 바다`}}}},
+  {name:"get_sea_forecast",description:"기상청 중기해상예보로 4~10일 뒤 날짜별 파고와 날씨, 물질 적합 여부를 가져온다. 주말·다음 주·며칠 뒤 물질 계획을 물을 때 사용. 1~3일 뒤 예보는 없다.",
+    parameters:{type:"object",properties:{site:{type:"string",description:"관측소 이름 또는 코드. 생략하면 오늘 선택한 바다"}}}},
+  {name:"send_check_message",description:"해녀의 마이크로비트로 괜찮은지 묻는 확인 신호를 보낸다. 해녀가 버튼으로 응답하면 가짜 경보로 해제되고, 정해진 시간 안에 응답이 없으면 비상으로 판단해 모의 신고로 넘어간다. 사용자가 특정 해녀가 괜찮은지 확인해 달라고 할 때 사용.",
+    parameters:{type:"object",properties:{diver_id:{type:"integer"}},required:["diver_id"]}},
+  {name:"recall_diver",description:"해녀 마이크로비트로 '쉬러 나오세요' 신호를 보낸다(소리와 화살표). 위험하거나 물질 시간이 길 때, 사용자가 쉬라고 하라고 할 때 사용. diver_id 0이면 모두에게.",
+    parameters:{type:"object",properties:{diver_id:{type:"integer",description:"해녀 번호, 0이면 모두"},reason:{type:"string"}},required:["diver_id"]}},
+  {name:"compare_seas",description:"여러 관측소의 오늘 실측 수온을 비교해 물질하기 가장 좋은 바다를 추천한다. 어디로 갈지, 어느 바다가 좋은지 물을 때 사용.",
+    parameters:{type:"object",properties:{sites:{type:"array",items:{type:"string"},description:`비교할 관측소 이름들. 생략하면 같은 해역. 가능한 이름: ${STATION_LIST}`}}}},
+  {name:"set_reminder",description:"몇 분 뒤에 관리자에게 알림을 띄운다. '30분 뒤에 쉬라고 알려줘' 같은 요청에 사용.",
+    parameters:{type:"object",properties:{minutes:{type:"number"},message:{type:"string",description:"알림에 띄울 말"},diver_id:{type:"integer",description:"특정 해녀에 대한 알림이면 번호"}},required:["minutes","message"]}},
+  {name:"remember_note",description:"해녀의 건강 특이사항이나 관리자가 알려준 사실을 기억한다. '기억해', '적어둬' 같은 요청에 사용. 이후 판단에 반영한다.",
+    parameters:{type:"object",properties:{note:{type:"string"}},required:["note"]}},
+  {name:"open_emergency_report",description:"확인 절차 없이 바로 해양경찰 122·119 모의 신고 화면을 연다. 사용자가 즉시 신고를 명확히 요청했을 때만 사용.",
+    parameters:{type:"object",properties:{diver_id:{type:"integer"},reason:{type:"string"}},required:["diver_id"]}}
+]}];
+async function runTool(name,args){
+  if(name==="get_divers_status") return {divers:diversStatus()};
+  if(name==="check_sea_conditions"){ const st=station(args.site||S.site); if(fresh(LAST.sea) && st && LAST.sea.code===st.code) return LAST.sea.r; return await checkSea(args.site||S.site); }
+  if(name==="get_sea_forecast"){ const st=station(args.site||S.site); if(fresh(LAST.fcst) && st && LAST.fcst.reg===st.reg) return LAST.fcst.r; return await checkFcst(args.site||S.site); }
+  if(name==="send_check_message"){ const d=divers.get(+args.diver_id); if(!d) return {error:"그 번호의 해녀가 없음"}; openEmergency(d,true,"AI 에이전트 요청"); return {ok:true,note:`확인 신호를 보냄. ${S.t.countdown}초 안에 응답 없으면 비상 처리. 결과는 앱이 대화창에 따로 알림`}; }
+  if(name==="open_emergency_report"){ const d=divers.get(+args.diver_id); if(!d) return {error:"그 번호의 해녀가 없음"}; if(args.reason) d.reasons=[args.reason,...d.reasons]; if(!(emg.active&&emg.diver===d)){ clearInterval(emg.timer); emg.active=true; emg.diver=d; if(!$("emg").open) $("emg").showModal(); } doReport(args.reason||"관리자가 AI에게 바로 신고를 요청함"); return {ok:true,note:"모의 신고 화면을 열었음. 실제 신고는 전송되지 않음"}; }
+  if(name==="recall_diver") return await recallDiver(+args.diver_id||0, args.reason, "AI 에이전트");
+  if(name==="compare_seas") return await compareSeas(args.sites);
+  if(name==="set_reminder") return setReminder(args.minutes, args.message, args.diver_id);
+  if(name==="remember_note") return rememberNote(args.note);
+  return {error:"알 수 없는 도구"};
+}
+const TOOL_LABEL={recall_diver:"쉬러 나오라는 신호 보내기",compare_seas:"여러 바다 수온 비교",set_reminder:"알림 예약",remember_note:"기억하기",send_check_message:"해녀에게 확인 신호 보내기",get_divers_status:"해녀 상태 조회",check_sea_conditions:"실측 수온 조회",get_sea_forecast:"기상청 해상예보 조회",open_emergency_report:"신고 화면 열기"};
+/* ================= 에이전트: 스스로 살피고 판단하고 행동하기 ================= */
+// 관찰(수온·예보·해녀 상태) → 판단(앱 기준) → 행동(알림, 쉬라는 신호, 확인 신호, 알림 예약)
+const AG={auto:true, notes:[], reminders:[], lastNudge:{}, briefed:false};
+try{ const sv=JSON.parse(localStorage.getItem("sumbi-agent")||"null"); if(sv){ AG.auto=sv.auto!==false; AG.notes=sv.notes||[]; } }catch(e){}
+function agSave(){ try{ localStorage.setItem("sumbi-agent",JSON.stringify({auto:AG.auto,notes:AG.notes})); }catch(e){} }
+const diveMinutes=d=>d.sessionStart?Math.max(0,Math.round((now()-d.sessionStart)/60000)):0;
+const seaGuide=()=>fresh(LAST.sea)?diveGuide(LAST.sea.r.temp):null;
+
+// 마이크로비트로 한 줄 보내기 (수신용 마이크로비트가 라디오로 해녀에게 전달)
+async function sendLine(line){
+  if(port && port.writable){
+    try{ const w=port.writable.getWriter(); await w.write(new TextEncoder().encode(line+"\n")); w.releaseLock(); return true; }
+    catch(e){ log("신호 전송 실패: "+(e.message||e)); return false; }
+  }
+  return sim.on;
+}
+// 쉬러 나오라는 신호 (id가 0이면 모두)
+async function recallDiver(id, reason, by){
+  const ids = id ? [id] : [...divers.keys()];
+  const ok = await sendLine(`R,${id||0}`);
+  ids.forEach(i=>{ const d=divers.get(i); if(d && d.under) d.pendingRecall=true; });   // 물속이면 올라올 때 다시 보냄
+  const g=seaGuide();
+  ids.forEach(i=>{
+    const d=divers.get(i); if(!d) return;
+    d.recalledAt=now(); d.nudged=false;
+    d.sessionStart=now()+((g?.restMin||15)*60000);   // 쉬는 시간이 끝나면 물질 시간을 다시 셈
+    if(sim.on && sim.st[i] && ["hr","cold","long"].includes(sim.st[i].scenario)){
+      setTimeout(()=>{ if(["hr","cold","long"].includes(sim.st[i].scenario)){ sim.st[i].scenario="normal"; renderSim(); log(`${nameOf(i)}: 물 밖으로 나와 쉬는 중 (시뮬레이션)`); } },6000);
+    }
+  });
+  log(`${id?nameOf(id):"모든 해녀"}: 쉬러 나오라는 신호 ${ok?"보냄":"못 보냄(연결 없음)"} · ${by||"에이전트"}${reason?" · "+reason:""}`);
+  return {ok, to:id?nameOf(id):"모두", note:ok?"해녀 마이크로비트가 소리와 위쪽 화살표로 알림":"마이크로비트 연결이 없어 신호를 못 보냄"};
+}
+// 여러 바다 수온을 비교해서 추천
+async function compareSeas(names){
+  let list = (names&&names.length? names.map(station).filter(Boolean) : null);
+  if(!list||!list.length){ const reg=station(S.site)?.reg; list=STATIONS.filter(s=>s.reg===reg); if(list.length<3) list=STATIONS.slice(0,5); }
+  list=list.slice(0,5);
+  const rows=[];
+  for(const st of list){ try{ const w=await getWater(st.code); const a=assessDive(w); rows.push({바다:st.name,수온:w.temp,판정:a.verdict,level:a.level}); }catch(e){ rows.push({바다:st.name,오류:e.message}); } }
+  const ok=rows.filter(r=>r.수온!=null).sort((a,b)=>a.level-b.level||Math.abs(a.수온-20)-Math.abs(b.수온-20));
+  return {비교:rows, 추천:ok[0]?ok[0].바다:null};
+}
+// 몇 분 뒤 알림
+function setReminder(minutes, message, diverId){
+  const m=Math.max(1,Math.min(240,Math.round(+minutes||0)));
+  const at=now()+m*60000, d=diverId?divers.get(+diverId):null;
+  const r={at, message:message||"쉬러 나올 시간이에요", diver:d?d.id:null};
+  AG.reminders.push(r);
+  setTimeout(()=>{
+    AG.reminders=AG.reminders.filter(x=>x!==r);
+    beep(880,250,3);
+    agentNotice(`⏰ ${d?nameOf(d.id)+" 삼촌, ":""}${r.message}`, d?[["쉬라고 신호 보내기",()=>recallDiver(d.id,"예약 알림","관리자")]]:[["모두에게 쉬라고 신호",()=>recallDiver(0,"예약 알림","관리자")]], ["예약한 알림"]);
+  }, m*60000);
+  log(`에이전트: ${m}분 뒤 알림 예약 · ${r.message}`);
+  const t=new Date(at); return {ok:true, minutes:m, at:`${t.getHours()}시 ${t.getMinutes()}분`};
+}
+function rememberNote(note){
+  note=String(note||"").trim(); if(!note) return {error:"기억할 내용이 없음"};
+  AG.notes.unshift({at:new Date().toISOString(), note}); AG.notes=AG.notes.slice(0,20); agSave();
+  log("에이전트가 기억함: "+note);
+  return {ok:true, saved:note};
+}
+
+// 에이전트가 먼저 말을 거는 카드 (관찰·판단·행동 단계와 바로 누를 수 있는 버튼)
+function agentNotice(text, actions, steps){
+  const m=document.createElement("div"); m.className="msg bot proactive";
+  m.innerHTML=`<div class="pro-h">에이전트가 먼저 알려요 · ${hhmm().slice(0,5)}</div>${steps&&steps.length?`<div class="steps">${steps.map(s=>`<span>${esc(s)}</span>`).join("")}</div>`:""}<div class="pro-t"></div>`;
+  m.querySelector(".pro-t").textContent=text;
+  if(actions&&actions.length){
+    const row=document.createElement("div"); row.className="pro-a";
+    actions.forEach(([label,fn])=>{ const b=document.createElement("button"); b.type="button"; b.className="btn small"; b.textContent=label;
+      b.onclick=async()=>{ row.querySelectorAll("button").forEach(x=>x.disabled=true); b.textContent=label+" ✓"; await fn(); }; row.append(b); });
+    m.append(row);
+  }
+  chatEl.append(m); chatEl.scrollTop=chatEl.scrollHeight;
+  return m;
+}
+// 작업 과정 표시 (에이전트가 무엇을 확인하고 했는지)
+let curTrace=null;
+function newTrace(title){
+  const m=document.createElement("div"); m.className="msg tool trace";
+  m.innerHTML=`<b></b><ol></ol>`; m.querySelector("b").textContent=title||"에이전트 작업 중";
+  chatEl.append(m); chatEl.scrollTop=chatEl.scrollHeight;
+  return { el:m, n:0,
+    add(t){ this.n++; const li=document.createElement("li"); li.textContent=t; m.querySelector("ol").append(li); chatEl.scrollTop=chatEl.scrollHeight; return li; },
+    done(){ m.querySelector("b").textContent=`에이전트 작업 ${this.n}단계 완료`; m.classList.add("done"); } };
+}
+function summarize(name,r){
+  if(!r||r.error) return r&&r.error?` → 실패: ${r.error}`:"";
+  if(name==="check_sea_conditions") return ` → ${r.site} ${r.temp}℃, ${r.verdict}`;
+  if(name==="get_sea_forecast") return ` → ${r.regName} ${r.days?.length||0}일치`;
+  if(name==="get_divers_status") return ` → ${r.divers.length}명, 살펴볼 사람 ${r.divers.filter(d=>d.level!=="정상").length}명`;
+  if(name==="compare_seas") return ` → 추천 ${r.추천||"없음"}`;
+  if(name==="recall_diver") return ` → ${r.to}${r.ok?"에게 보냄":" 못 보냄"}`;
+  if(name==="set_reminder") return ` → ${r.at}에 알림`;
+  if(name==="remember_note") return ` → 기억함`;
+  return " → 완료";
+}
+
+// 계속 지켜보기: 상태가 나빠지거나 물질 시간이 기준을 넘기면 먼저 알리고, 자율 모드면 바로 행동
+function agentWatch(){
+  if(!AG.briefed) return;   // 아침 브리핑을 먼저 하고 나서 지켜보기 시작
+  const g=seaGuide();
+  for(const d of divers.values()){
+    if(d.level===0) d.agLevel=0;
+    if(d.level>=1 && d.level<=2 && d.level>(d.agLevel||0) && now()-(AG.lastNudge[d.id]||0)>120000){
+      AG.lastNudge[d.id]=now(); d.agLevel=d.level;
+      const why=sayReason(d.reasons[0]);
+      if(AG.auto && d.level===2){
+        recallDiver(d.id,d.reasons[0],"자율 모드");
+        agentNotice(d.under?`${nameOf(d.id)} 삼촌 ${why} 물속이라 신호가 안 닿아서, 올라오는 순간 쉬러 나오라는 신호가 가도록 해 뒀어요. 더 길어지면 주변 해녀에게 도움 신호를 보낼게요.`:`${nameOf(d.id)} 삼촌 ${why} 위험 단계라 쉬러 나오라는 신호를 바로 보냈어요. 응답이 없으면 괜찮은지 확인할게요.`,
+          [["지금 괜찮은지 확인",()=>openEmergency(d,true,"에이전트 제안")]], ["관찰: 상태 변화","판단: 위험","행동: 휴식 신호"]);
+      } else {
+        agentNotice(`${nameOf(d.id)} 삼촌 ${why} ${d.level===2?"위험 단계예요.":"아직은 주의 단계라 지켜보고 있어요."} 쉬라고 할까요?`,
+          [["쉬라고 신호 보내기",()=>recallDiver(d.id,d.reasons[0],"관리자")],["괜찮은지 확인",()=>openEmergency(d,true,"에이전트 제안")]], ["관찰: 상태 변화","판단: "+LV[d.level]]);
+      }
+    }
+    if(g && g.diveMin && !d.nudged && d.sessionStart && diveMinutes(d)>=g.diveMin && now()-d.lastAt<60000){
+      d.nudged=true;
+      const msg=`${nameOf(d.id)} 삼촌이 ${diveMinutes(d)}분째 물질 중이에요. 오늘 물(${LAST.sea.r.temp}도)은 한 번에 ${g.diveMin}분이 기준이라`;
+      if(AG.auto){ recallDiver(d.id,`물질 ${diveMinutes(d)}분`,"자율 모드"); agentNotice(`${msg} 쉬러 나오라는 신호를 보냈어요. ${g.rest}.`, [], ["관찰: 물질 시간","판단: 기준 초과","행동: 휴식 신호"]); }
+      else agentNotice(`${msg} 이제 쉬어야 해요.`, [["쉬라고 신호 보내기",()=>recallDiver(d.id,"물질 시간 초과","관리자")]], ["관찰: 물질 시간","판단: 기준 초과"]);
+    }
+  }
+}
+// 앱을 열면 에이전트가 스스로 오늘 물질을 확인하고 브리핑
+function ruleBrief(sea,f){
+  const g=sea&&!sea.error?diveGuide(sea.temp):null;
+  const ds=diversStatus(), bad=ds.filter(d=>d.level!=="정상");
+  const p=[];
+  p.push(g?`${g.call}. ${sea.site.replace("제주 ","")} 물이 ${sea.temp}도라 ${g.dive}, ${g.rest}.`:"수온을 아직 못 가져왔어요.");
+  p.push(bad.length?bad.map(d=>`${d.name} 삼촌은 ${sayReason(d.reasons[0])}`).join(" ")+" 지켜보고 있어요.":`해녀 ${ds.length}분 모두 괜찮아요.`);
+  if(f&&f.days&&f.days.length){ const rough=f.days.filter(d=>d.level===2).map(d=>d.date); p.push(rough.length?`${rough.join(", ")}은 파도가 높아 쉬는 날로 잡으세요.`:`앞으로 일주일은 파도 때문에 쉴 날은 없어요.`); }
+  return p.join(" ");
+}
+async function agentBrief(){
+  if(AG.briefing||AG.briefed) return; AG.briefing=true;
+  const tr=newTrace("에이전트가 오늘 물질을 먼저 확인하는 중");
+  const s1=tr.add("실측 수온 조회"); const sea=await runTool("check_sea_conditions",{}); s1.textContent+=summarize("check_sea_conditions",sea);
+  const s2=tr.add("기상청 해상예보 조회"); const f=await runTool("get_sea_forecast",{}); s2.textContent+=summarize("get_sea_forecast",f);
+  const s3=tr.add("해녀 상태 확인"); s3.textContent+=summarize("get_divers_status",{divers:diversStatus()});
+  let text=ruleBrief(sea,f);
+  if(aiReady()){
+    const s4=tr.add("Gemini로 브리핑 정리");
+    try{ const t=tidy(await geminiText("지금 데이터로 해녀회장에게 오늘 물질 브리핑을 해라. 오늘 물질 판단과 한 번 물질·휴식 시간, 살펴볼 해녀, 앞으로 쉬는 날 순서로 3~4문장. 말하는 방식 규칙을 지켜라.")); if(t) text=t; }
+    catch(e){ s4.textContent+=" → 실패, 앱 기준으로 정리"; }
+  }
+  tr.done();
+  const m=agentNotice(text, [], []); m.querySelector(".pro-h").textContent=`📋 오늘 물질 브리핑 · ${hhmm().slice(0,5)}`;
+  for(const d of divers.values()){ if(d.level>=1){ d.agLevel=d.level; AG.lastNudge[d.id]=now(); } }   // 브리핑에서 말한 사람은 바로 또 알리지 않음
+  AG.briefed=true;
+}
+
+// 수온별 물질 가이드 (앱 기준, 참고용). AI가 막연한 말 대신 이 숫자로 답하게 함
+function diveGuide(t){
+  if(t==null||Number.isNaN(t)) return null;
+  if(t<S.t.seaMin) return {diveMin:0,restMin:0,call:"오늘은 쉬세요", dive:"물질은 하지 말고", rest:"망사리 손질하며 쉬세요", tip:"이 수온에선 몇십 분 만에 손발이 굳고 판단이 흐려져요"};
+  if(t<S.t.seaWarn) return {diveMin:40,restMin:20,call:"짧게만 들어가세요", dive:"한 번에 40분 안쪽으로 하고", rest:"나와서 불턱에서 20분은 몸을 녹이세요", tip:"오늘은 두 번까지만 들어가고, 두꺼운 잠수복과 장갑을 챙기세요"};
+  if(t<=20) return {diveMin:60,restMin:15,call:"들어가도 돼요", dive:"한 번에 1시간 정도 하고", rest:"나와서 15분은 쉬세요", tip:"입술이 파래지거나 손이 떨리면 그날은 바로 올라오세요"};
+  if(t<=S.t.seaHigh) return {diveMin:90,restMin:15,call:"들어가기 좋은 물이에요", dive:"한 번에 1시간 30분 정도 하고", rest:"나와서 15분 쉬며 물을 꼭 드세요", tip:"물이 따뜻하다고 오래 있으면 숨이 짧아지니 욕심내지 마세요"};
+  return {diveMin:60,restMin:20,call:"짧게 나눠 들어가세요", dive:"한 번에 1시간 안쪽으로 하고", rest:"그늘에서 20분 쉬며 물을 드세요", tip:"더운 날은 탈수와 어지럼증이 먼저 오니 조심하세요"};
+}
+const SYSTEM=()=>{
+  const sea=fresh(LAST.sea)?LAST.sea.r:null, g=sea?diveGuide(sea.temp):null;
+  const ds=diversStatus(), bad=ds.filter(d=>d.level!=="정상");
+  return `너는 '숨비 지킴이'다. 제주 어촌계 해녀들의 물질 안전을 챙기는 관제 도우미로, 불턱에서 해녀 삼촌들과 오래 지낸 사람처럼 말한다.
+듣는 사람: 해녀 어르신 또는 해녀회장·어촌계 관리자.
+
+[말하는 방식]
+- 첫 문장에 결론부터. "들어가도 돼요" / "짧게만 들어가세요" / "오늘은 쉬세요"처럼 딱 잘라 말한다.
+- 그다음 근거를 숫자로 한두 개 (수온 몇 도, 파고 몇 m, 누가 몇 초째 신호 없음).
+- 마지막에 지금 할 일 한 가지를 구체적으로 (몇 분 물질, 몇 분 쉬기, 누구에게 무엇을).
+- 전체 2~4문장. 목록은 날짜별 예보처럼 꼭 필요할 때만.
+- 말투는 다정한 존댓말 구어체("~요"). 물질, 불턱, 테왁, 망사리, 숨비소리, 물때 같은 말을 자연스럽게 쓴다. 해녀 이름이 있으면 이름을 부른다.
+- 쓰지 않는 말: "안전에 유의하세요", "~하시기 바랍니다", "참고로", "중요합니다", "도움이 되셨길", "궁금한 점이 있으면", "AI로서", 느낌표 여러 개, 이모지, 별표(**)와 #.
+- 모르는 건 모른다고 한다. 데이터에 없는 수온·파고·건강 수치를 지어내지 않는다.
+
+[에이전트로서]
+- 너는 묻는 말에 답만 하는 챗봇이 아니라 스스로 확인하고 행동하는 에이전트다. 필요한 정보는 도구로 직접 확인하고, 여러 단계가 필요하면 순서대로 도구를 여러 번 부른다.
+- 행동 도구: recall_diver(쉬러 나오라는 신호), send_check_message(괜찮은지 확인), set_reminder(알림 예약), remember_note(기억하기), compare_seas(바다 비교).
+- 사용자가 행동을 부탁하면 되묻지 말고 바로 한다. 해녀 이름이 있으면 번호를 찾아 쓴다. 행동했으면 무엇을 했는지 한 줄로 말한다.
+- 위험이 분명하거나 물질 시간이 기준을 넘긴 해녀가 있으면, 질문과 상관없어도 마지막에 짧게 알리고 신호를 보낼지 제안한다(자율 모드면 바로 보낸다).
+- 기억한 메모는 판단에 반영한다 (예: 무릎이 안 좋은 삼촌은 물질 시간을 더 짧게).
+
+[해녀 상태를 아는 방법]
+- 라디오 신호가 끊기면 물질 중(물속), 다시 잡히면 휴식 중(물 위)이다. 끊겨 있던 시간이 한 번의 잠수 시간이다.
+- 물속 ${S.t.lostWarn}초 넘으면 주의, ${S.t.lostDanger}초 위험, ${S.t.lostCrit}초 위급. 긴 잠수 뒤 물 위에서 ${S.t.minRest}초도 안 쉬고 다시 들어가면 주의.
+- 물속에서는 신호가 닿지 않아 확인 신호를 못 받는다. 위급하면 주변 해녀에게 도움 신호를 보내고, 올라오면 자동 해제된다. 휴식 신호는 올라올 때 전달된다.
+- 맥박·온도는 물 위에 있을 때 값만 믿는다.
+
+[판단 규칙]
+- 오늘 물질 여부는 아래 '물질 가이드'와 수온 판정을 그대로 따른다. 가이드의 물질 시간·휴식 시간을 그대로 인용한다.
+- 며칠 뒤는 get_sea_forecast. 이 예보는 4~10일 뒤만 있다. 1~3일 뒤는 "아직 예보가 없어요, 전날 저녁에 다시 물어보세요"라고 한다. 파고 2.5m 이상은 주의, 3m 이상은 쉬는 날.
+- 해녀가 위험해 보이면 이름과 상황을 먼저 말하고, 앱이 확인 신호를 보내는지 알려준다. 특정 해녀 확인을 부탁받으면 send_check_message.
+- 신고 화면은 데모데이 시연용 모의 신고다. 실제로 신고했다고 말하지 않는다. 진짜 위급이면 해양경찰 122, 119에 바로 전화하라고 한다.
+- 아래 데이터에 답이 있으면 도구를 부르지 말고 바로 답한다. 다른 바다를 묻거나 데이터가 없을 때만 도구를 쓴다.
+
+[좋은 답 예시]
+질문: 오늘 물질해도 돼?
+답: 들어가도 돼요. 성산포 물이 18.4도라 한 번에 1시간 정도 하고, 나와서 15분 쉬면 충분해요. 입술이 파래지거나 손이 떨리면 그날은 바로 올라오세요.
+
+질문: 해녀들 상태 어때?
+답: 고옥자 삼촌만 살펴보면 돼요. 맥박이 168회로 높게 나와요. 지금 물 밖에 계시면 불턱에서 10분 숨 고르고 다시 재 보세요. 나머지 두 분은 괜찮아요.
+
+질문: 다음 주 파도 어때?
+답: 화요일까지는 1~2m라 물질하기 괜찮아요. 금요일은 2~3m로 높아지니 그날은 쉬는 게 좋아요. 1~3일 뒤 바다는 아직 예보가 없어요.
+
+[지금 데이터]
+오늘(한국 시각): ${kstNow().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})} ${kstNow().getHours()}시. 고른 바다: ${station(S.site)?.name||S.site}.
+오늘 수온: ${sea?`${sea.site} ${sea.temp}℃ (관측 ${sea.obsTime||"시각 모름"}), 판정 ${sea.verdict}`:"아직 없음(도구 사용)"}
+물질 가이드(앱 기준): ${g?`${g.call} · ${g.dive} · ${g.rest} · ${g.tip}`:"수온이 있어야 나옴"}
+해녀 ${ds.length}명: ${ds.length?ds.map(d=>`${d.name} ${d.state} ${d.under_sec?`물속 ${d.under_sec}초째`:`물 위 ${d.rest_sec}초째`}, 잠수 ${d.dives}번(최근 ${d.last_dive??"-"}초, 최장 ${d.max_dive||"-"}초), ${d.level}${d.level!=="정상"?"("+d.reasons.join(", ")+")":""}${d.bpm?` 맥박 ${d.bpm}`:""}${d.seconds_since_signal!=null&&d.seconds_since_signal>20?` 신호끊김 ${d.seconds_since_signal}초`:""}`).join(" / "):"신호 없음"}
+살펴볼 사람: ${bad.length?bad.map(d=>d.name).join(", "):"없음"}
+해녀 번호: ${ds.map(d=>`${d.id}=${d.name}`).join(", ")} · 물질 시간: ${ds.map(d=>`${d.name} ${d.dive_min}분째`).join(", ")}${g&&g.diveMin?` (오늘 기준 한 번 ${g.diveMin}분)`:""}
+자율 모드: ${AG.auto?"켜짐(위험·시간 초과 시 직접 휴식 신호)":"꺼짐(제안만)"}
+기억한 메모: ${AG.notes.length?AG.notes.map(n=>n.note).join(" / "):"없음"}
+예약된 알림: ${AG.reminders.length?AG.reminders.map(r=>`${new Date(r.at).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})} ${r.message}`).join(" / "):"없음"}
+비상 처리: ${emgStatus()}
+파고 전망(4~10일 뒤, ${fresh(LAST.fcst)?LAST.fcst.r.regName:""}): ${fresh(LAST.fcst)?LAST.fcst.r.days.map(d=>`${d.date} ${d.waveMin}~${d.waveMax}m ${d.weather}`).join(", "):"아직 없음(도구 사용)"}`;
+};
+const wv=d=>d.waveMin===d.waveMax?`${d.waveMax}m`:`${d.waveMin}~${d.waveMax}m`;
+function sayReason(r){
+  r=String(r||"").replace(/\s*\(.*\)$/,"");
+  const m=r.match(/^맥박 (\d+)/); if(m) return `맥박이 ${m[1]}회로 ${+m[1]>=100?"높아요":"낮아요"}.`;
+  const u=r.match(/^물속 (\d+)초째/); if(u) return `물속에 ${fmtSec(+u[1])}째 있어요.`;
+  const q=r.match(/^물 위에서 (\d+)초만 쉬고/); if(q) return `물 위에서 ${q[1]}초만 쉬고 다시 들어갔어요.`;
+  return r.replace(/회\/분/,"회")+".";
+}
+// AI 답에서 기계적인 표현을 걷어냄
+function tidy(t){
+  return String(t||"").replace(/\*\*|__|^#+\s*/gm,"").replace(/!{2,}/g,"!")
+    .replace(/\s*(안전(한 물질)?에 (각별히 )?유의하세요\.?|도움이 되(셨|었)(길|으면) (바랍니다|좋겠어요)\.?|궁금한 (점|것)이 있으(시)?면[^.]*\.?)\s*$/,"")
+    .replace(/\n{3,}/g,"\n\n").trim();
+}
+let history=[];
+// 생각 단계를 줄여 빠르게. 모델마다 받는 설정이 달라서, 거부당하면 다음 방식으로 바꿔 재시도
+const THINK_MODES=[{thinkingBudget:0},{thinkingLevel:"minimal"},{thinkingLevel:"low"},null];
+let thinkIdx=0; try{ thinkIdx=+(localStorage.getItem("sumbi-think")||0)||0; }catch(e){}
+let sysNow="";
+async function gemini(contents,noTools){
+  const req={systemInstruction:{parts:[{text:sysNow||SYSTEM()}]},contents,generationConfig:{temperature:0.3,topP:0.9}};
+  if(!noTools) req.tools=TOOLS;
+  const tm=THINK_MODES[thinkIdx]; if(tm) req.generationConfig.thinkingConfig=tm;
+  const body=JSON.stringify(req);
+  const useProxy = PROXY && S.proxyInfo?.gemini && !S.ai.key;
+  const url = useProxy ? `/api/gemini?model=${encodeURIComponent(S.ai.model)}`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(S.ai.model)}:generateContent`;
+  const headers={"Content-Type":"application/json"}; if(!useProxy) headers["x-goog-api-key"]=S.ai.key;
+  const res=await fetch(url,{method:"POST",headers,body});
+  const j=await res.json().catch(()=>({}));
+  if(!res.ok && res.status===400 && thinkIdx<THINK_MODES.length-1){ thinkIdx++; try{ localStorage.setItem("sumbi-think",thinkIdx); }catch(e){} return gemini(contents,noTools); }
+  if(!res.ok && res.status===404 && S.ai.model!=="gemini-flash-latest"){ S.ai.model="gemini-flash-latest"; setMode(); return gemini(contents,noTools); }
+  if(!res.ok){ const m=j.error?.message||res.status; if(res.status===429) throw new Error("무료 사용량을 잠시 다 썼어요. 1분쯤 뒤 다시 해보세요"); throw new Error("AI 호출 실패: "+m); }
+  const c=j.candidates?.[0]?.content; if(!c) throw new Error("AI가 답을 주지 않았어요");
+  return c;
+}
+async function agentLLM(text){
+  sysNow=SYSTEM();   // 질문 시점의 화면 데이터를 함께 보냄
+  history.push({role:"user",parts:[{text}]});
+  for(let step=0;step<6;step++){
+    const c=await gemini(history); history.push(c);
+    const calls=(c.parts||[]).filter(p=>p.functionCall);
+    if(!calls.length){ const out=tidy((c.parts||[]).map(p=>p.text||"").join("")); trimHistory(); return out||"(답이 비어 있어요)"; }
+    const resp=[];
+    for(const p of calls){ const {name,args}=p.functionCall; const li=step(TOOL_LABEL[name]||name); const result=await runTool(name,args||{}); if(li) li.textContent+=summarize(name,result); resp.push({functionResponse:{name,response:{result}}}); }
+    history.push({role:"user",parts:resp});
+  }
+  return "처리 단계가 너무 길어져 멈췄어요. 질문을 조금 더 짧게 해주세요.";
+}
+function trimHistory(){ while(history.length>24){ history.shift(); while(history.length && !(history[0].role==="user" && history[0].parts.some(p=>p.text))) history.shift(); } }
+
+// AI를 못 쓸 때의 규칙 기반 에이전트
+async function agentRule(text){
+  const parts=[];
+  const findDiver=()=>{ for(const d of divers.values()){ const n=nameOf(d.id).replace(/\(예시\)/,"").trim(); if(n && (text.includes(n) || (n.length>=3 && text.includes(n.slice(1))))) return d; } return null; };
+  if(/기억해|적어\s?둬|적어\s?줘|메모해/.test(text)){
+    const note=text.replace(/\s*(기억해\s?(줘|둬|주세요)?|적어\s?(줘|둬)|메모해\s?(줘|둬)?)[.!]?\s*$/,"").trim();
+    step("기억하기"); rememberNote(note);
+    return `기억해 둘게요. "${note}" 앞으로 판단할 때 같이 볼게요.`;
+  }
+  const mm=text.match(/(\d+)\s*분\s*(뒤|후|있다가)/);
+  if(mm){
+    const d=findDiver();
+    const msg=/쉬/.test(text)?"쉬러 나올 시간이에요":(text.replace(mm[0],"").replace(/알려\s?줘|알림|해\s?줘/g,"").trim()||"알림 시간이에요");
+    const li=step("알림 예약"); const r=setReminder(+mm[1],msg,d?.id); li.textContent+=summarize("set_reminder",r);
+    return `${r.at}에 알려 드릴게요${d?` (${nameOf(d.id)} 삼촌)`:""}. 그때 바로 쉬라는 신호를 보낼 수 있게 버튼도 같이 띄울게요.`;
+  }
+  if(/쉬라|나오라|올라오라|불러|휴식 신호/.test(text)){
+    const d=findDiver(), all=!d&&/모두|다들|전부|모든/.test(text);
+    if(d||all){
+      const li=step("쉬러 나오라는 신호 보내기"); const r=await recallDiver(d?d.id:0,"관리자 요청","AI 에이전트"); li.textContent+=summarize("recall_diver",r);
+      return r.ok?`${r.to}${d?" 삼촌":""}에게 쉬러 나오라는 신호를 보냈어요. 마이크로비트가 소리와 위쪽 화살표로 알려요.`:"마이크로비트가 연결되지 않아 신호를 못 보냈어요. 연결하고 다시 시켜 주세요.";
+    }
+  }
+  if(/비교|어느 바다|어디가|어디로|제일 좋/.test(text)){
+    const li=step("여러 바다 수온 비교"); const r=await compareSeas(); li.textContent+=summarize("compare_seas",r);
+    const ok=r.비교.filter(x=>x.수온!=null).sort((a,b)=>b.수온-a.수온);
+    if(!r.추천) return "비교할 수온을 못 가져왔어요.";
+    const g=diveGuide(ok.find(x=>x.바다===r.추천).수온);
+    return `${r.추천} 바다가 제일 좋아요. ${ok.map(x=>`${x.바다} ${x.수온}도`).join(", ")}예요. ${r.추천}에서는 ${g.dive}, ${g.rest}.`;
+  }
+  const st=STATIONS.find(s=>text.includes(s.name.replace("제주 ","")));
+  const wantsFcst=/주말|다음|며칠|이번 ?주|언제|파고|파도|모레|글피|예보/.test(text);
+  const wantsSea=!wantsFcst && /수온|물질|바다|들어가|가도|추워|오늘/.test(text);
+  const wantsHealth=/상태|건강|괜찮|위험|해녀|누구|맥박/.test(text);
+  if(/신고|구조|도와/.test(text)){
+    const worst=[...divers.values()].sort((a,b)=>b.level-a.level)[0];
+    if(worst && worst.level>=2){ say("tool","🔧 신고 화면 열기"); await runTool("open_emergency_report",{diver_id:worst.id}); parts.push(`${nameOf(worst.id)}님 신고 확인 화면을 열었어요. 시연용 모의 신고라 실제로는 전송되지 않아요.`); }
+    else parts.push("지금 위험 단계인 해녀는 없어요. 실제로 위급하면 바로 122(해양경찰)나 119에 전화하세요.");
+  }
+  if(wantsSea){
+    say("tool","🔧 실측 수온 조회");
+    const r=await runTool("check_sea_conditions",{site:st?.code});
+    if(r.error) parts.push("수온을 가져오지 못했어요: "+r.error);
+    else{ const g=diveGuide(r.temp); parts.push(`${g.call}. ${r.site.replace("제주 ","")} 물이 ${r.temp}도라 ${g.dive}, ${g.rest}. ${g.tip}.`); }
+  }
+  if(wantsFcst){
+    say("tool","🔧 기상청 해상예보 조회");
+    const f=await runTool("get_sea_forecast",{site:st?.code});
+    if(f.error) parts.push("해상예보를 가져오지 못했어요: "+f.error);
+    else{ const good=f.days.filter(d=>d.level===0).map(d=>d.date), bad=f.days.filter(d=>d.level===2).map(d=>d.date);
+      const calm=[...f.days].sort((a,b)=>a.waveMax-b.waveMax)[0];
+      parts.push((bad.length?`${bad.join(", ")}은 파도가 높아 쉬는 날로 잡으세요. `:`일주일 내내 파도가 ${Math.max(...f.days.map(d=>d.waveMax))}m 아래라 쉴 날은 없어요. `)+(calm?`제일 잔잔한 날은 ${calm.date}, ${wv(calm)}예요.`:"")+
+        `\n`+f.days.map(d=>`${d.date} ${wv(d)} ${d.weather}`).join("\n")+`\n1~3일 뒤 바다는 아직 예보가 없어요.`); }
+  }
+  if(wantsHealth || (!wantsSea && !wantsFcst && !parts.length)){
+    say("tool","🔧 해녀 상태 조회");
+    const {divers:list}=await runTool("get_divers_status",{});
+    if(!list.length) parts.push("아직 해녀 신호가 없어요.");
+    else{ const bad=list.filter(d=>d.level!=="정상");
+      parts.push(bad.length? bad.map(d=>`${d.name} 삼촌을 살펴보세요. ${sayReason(d.reasons[0])} ${d.level==="위급"?"앱이 확인 신호를 보내고 있어요.":"물 밖에 계시면 불턱에서 10분 숨 고르게 해 주세요."}`).join(" ")+(list.length>bad.length?` 나머지 ${list.length-bad.length}분은 괜찮아요.`:"") : `${list.length}분 모두 괜찮아요. 신호도 잘 들어오고 있어요.`); }
+  }
+  return parts.join("\n\n");
+}
+async function ask(text){
+  text=text.trim(); if(!text) return;
+  say("user",text); $("chatIn").value="";
+  curTrace=null; step("질문 이해하고 계획 세우기");
+  const wait=say("bot","생각 중…");
+  try{
+    let out;
+    if(aiReady()){ try{ out=await agentLLM(text); }catch(e){ history=[]; console.warn(e); out=await agentRule(text); toast("AI 연결이 안 돼서 앱 기준으로 답했어요"); } }
+    else out=await agentRule(text);
+    wait.textContent=out;
+  }catch(e){ wait.textContent="오류: "+(e.message||e); }
+  if(curTrace){ curTrace.done(); chatEl.append(wait); curTrace=null; }
+  chatEl.scrollTop=chatEl.scrollHeight;
+}
+$("chatForm").onsubmit=e=>{ e.preventDefault(); ask($("chatIn").value); };
+$("quick").addEventListener("click",e=>{ if(e.target.tagName==="BUTTON") ask(e.target.textContent); });
+$("btnClearLog").onclick=()=>{ $("log").innerHTML=""; };
+
+/* ================= 설정 화면 ================= */
+const F={aiKey:["ai","key"],aiModel:["ai","model"],wKey:["water","key"],wTempPath:["water","tempPath"],
+  tLostWarn:["t","lostWarn",1],tLostDanger:["t","lostDanger",1],tLostCrit:["t","lostCrit",1],tMinRest:["t","minRest",1],tFallStill:["t","fallStill",1],tStillWarn:["t","stillWarn",1],tCountdown:["t","countdown",1],
+  tSeaMin:["t","seaMin",1],tSeaWarn:["t","seaWarn",1],tWaveMax:["t","waveMax",1],rPlace:["report","place"],rPhone:["report","phone"],rLat:["report","lat"],rLon:["report","lon"]};
+$("btnSettings").onclick=()=>{
+  for(const [id,[a,b]] of Object.entries(F)) $(id).value=S[a][b]??"";
+  $("tBpm").value=`${S.t.bpmLo},${S.t.bpmHi}`;
+  $("rNames").value=Object.entries(S.names).map(([k,v])=>`${k}=${v}`).join("\n");
+  $("wRaw").hidden=true; apiNote(); $("settings").showModal();
+};
+$("setClose").onclick=()=>$("settings").close();
+$("setSave").onclick=()=>{
+  for(const [id,[a,b,num]] of Object.entries(F)){ const v=$(id).value.trim(); S[a][b]=num?(parseFloat(v)||DEFAULTS[a][b]):v; }
+  const bp=$("tBpm").value.split(",").map(Number); if(bp.length===2&&bp.every(n=>n>0)){ S.t.bpmLo=bp[0]; S.t.bpmHi=bp[1]; }
+  S.t.waveWarn=Math.max(0.5,Math.round((S.t.waveMax-0.5)*10)/10);
+  const names={}; $("rNames").value.split("\n").forEach(l=>{ const m=l.match(/^\s*(\d+)\s*=\s*(.+)$/); if(m) names[m[1]]=m[2].trim(); }); if(Object.keys(names).length) S.names=names;
+  if(!S.ai.model) S.ai.model=DEFAULTS.ai.model;
+  save(); setMode(); renderSim(); history=[]; $("settings").close(); toast("설정을 저장했어요"); checkSea(S.site); checkFcst(S.site);
+};
+async function showRaw(fn){
+  const raw=$("wRaw"); raw.hidden=false;
+  S.water.key=$("wKey").value.trim();
+  if(!hasData()){ raw.textContent="server.py로 실행하거나 인증키를 먼저 넣어주세요."; return; }
+  raw.textContent="불러오는 중…";
+  try{ raw.textContent=JSON.stringify(await fn(),null,2).slice(0,3000); }catch(e){ raw.textContent="실패: "+(e.message||e); }
+}
+$("wTest").onclick=()=>showRaw(async()=>(await waterItems(station(S.site)?.code||"DT_0022",today())).j);
+$("fTest").onclick=()=>showRaw(()=>dataGo("1360000/MidFcstInfoService/getMidSeaFcst",{dataType:"JSON",pageNo:"1",numOfRows:"10",regId:station(S.site)?.reg||"12B10500",tmFc:tmFc()}));
+$("rGeo").onclick=()=>{
+  const m=$("rGeoMsg");
+  if(!navigator.geolocation){ m.textContent="위치 기능이 없어요. 직접 입력하세요."; return; }
+  m.textContent="가져오는 중…";
+  navigator.geolocation.getCurrentPosition(p=>{ $("rLat").value=p.coords.latitude.toFixed(5); $("rLon").value=p.coords.longitude.toFixed(5); m.textContent="가져왔어요"; },
+    ()=>{ m.textContent="위치를 못 가져왔어요. 직접 입력하세요."; },{timeout:8000});
+};
+
+/* ================= 시작 ================= */
+setMode(); setConn(); renderSim();
+say("bot","숨비 지킴이 에이전트예요. 오늘 물질부터 먼저 살펴볼게요. 쉬라고 신호 보내기, 알림 예약, 바다 비교도 말로 시켜 주세요.");
+for(let i=0;i<3;i++) simStep();
+tick(); setInterval(tick,1000);
+$("autoOn").checked=AG.auto;
+$("autoOn").addEventListener("change",e=>{ AG.auto=e.target.checked; agSave(); log(`에이전트 자율 모드 ${AG.auto?"켬":"끔"}`); });
+log("시뮬레이션 시작 (예시 해녀 3명)");
+detectProxy().then(async()=>{ await Promise.all([checkSea(S.site), checkFcst(S.site)]); setTimeout(agentBrief,300); });
+</script>
+
+</body>
+</html>
